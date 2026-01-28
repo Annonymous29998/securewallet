@@ -4,7 +4,7 @@ let ready = false;
 
 async function init() {
   if (ready) return pool;
-  const url = process.env.POSTGRES_URL || '';
+  const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED || '';
   if (!url) {
     ready = false;
     return null;
