@@ -354,8 +354,9 @@ app.get('/api/token-price', async (req, res) => {
   }
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  const ok = await pgReady();
+  res.json({ status: 'ok', time: new Date().toISOString(), db: ok ? 'connected' : 'disconnected' });
 });
 
 app.get("/api/me", authMiddleware, (req, res) => {
