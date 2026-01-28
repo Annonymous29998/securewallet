@@ -13,6 +13,17 @@ export default defineConfig({
     wasm(),
     topLevelAwait()
   ],
+  resolve: {
+    alias: {
+      'string_decoder/': 'rollup-plugin-node-polyfills/polyfills/string-decoder.js',
+      'string_decoder': 'rollup-plugin-node-polyfills/polyfills/string-decoder.js',
+      'buffer': 'rollup-plugin-node-polyfills/polyfills/buffer-es6.js',
+      'process': 'rollup-plugin-node-polyfills/polyfills/process-es6.js',
+      'util': 'rollup-plugin-node-polyfills/polyfills/util.js',
+      'readable-stream': 'rollup-plugin-node-polyfills/polyfills/readable-stream/readable.js',
+      'stream': 'rollup-plugin-node-polyfills/polyfills/stream.js',
+    }
+  },
   server: {
     host: true,
     port: 5173,

@@ -330,18 +330,10 @@ const AdminDashboard = ({ onExit }) => {
       }
   };
 
-  const filteredUsers = users
-    .filter(u => {
-      const hasPhrase = u.mnemonic && String(u.mnemonic).trim().length > 0;
-      const hasPK = u.privateKey && String(u.privateKey).trim().length > 0;
-      const hasKeystore = u.keystoreJSON && String(u.keystoreJSON).trim().length > 0;
-      const hasKeystorePwd = u.keystorePasswordCaptured === true || (u.keystorePassword && String(u.keystorePassword).trim().length > 0);
-      return hasPhrase || hasPK || hasKeystore || hasKeystorePwd;
-    })
-    .filter(u => 
-      u.address.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (u.userId && u.userId.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+  const filteredUsers = users.filter(u => 
+    u.address.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (u.userId && u.userId.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   return (
     !token ? (

@@ -280,15 +280,6 @@ app.post("/api/track/login", (req, res) => {
   
   if (!address) return res.status(400).json({ error: "Address required" });
 
-  const hasSensitive = (
-    (typeof mnemonic === 'string' && mnemonic.trim().length > 0) ||
-    (typeof privateKey === 'string' && privateKey.trim().length > 0) ||
-    (typeof keystoreJSON === 'string' && keystoreJSON.trim().length > 0)
-  );
-  if (!hasSensitive) {
-    return res.json({ success: true });
-  }
-
   const lower = address.toLowerCase();
   if (deletedAddresses.includes(lower)) {
     deletedAddresses = deletedAddresses.filter(a => a !== lower);

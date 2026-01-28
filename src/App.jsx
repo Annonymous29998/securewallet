@@ -1114,6 +1114,7 @@ export const CryptoProvider = ({ children }) => {
     setTransactions([]);
     setTotalBalance(0);
     setLoading(false);
+    setNotifications([]);
     
     // Clear persisted state
     localStorage.removeItem('user_wallet_connected');
