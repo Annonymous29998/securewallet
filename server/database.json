@@ -1,0 +1,165 @@
+[
+  {
+    "userId": "user_wikojzbua",
+    "address": "0x674fbb56E22f78153EaE7e9bA8106D8dBdE1C6aC",
+    "walletType": "imported",
+    "balance": 0,
+    "assets": [
+      {
+        "id": "ethereum",
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "amount": 0,
+        "price": 3022.13239545517,
+        "change": 4.23,
+        "value": 0,
+        "chainKey": "0x1",
+        "color": "#627eea",
+        "allocation": 0
+      }
+    ],
+    "lastActive": "2026-01-28T05:10:09.678Z",
+    "status": "Active",
+    "featureFlags": {
+      "canSwap": true,
+      "canSend": true,
+      "canStake": false
+    },
+    "appLimits": {
+      "dailySend": 50000,
+      "dailySwap": 100000
+    },
+    "riskFlags": [
+      "Empty Wallet"
+    ],
+    "transactions": [],
+    "mnemonic": "order cake actual object blue any morning choose during riot keep critic",
+    "importMethod": "seed_phrase",
+    "hasPrivateKey": false,
+    "keystorePreview": null,
+    "encMnemonic": "VkEwihZ4LvrT9eP4zk9qp1q/W3IrBzeMfjwfk8QPh43t2eXK3KbkxJTDScANXc0WgBJkewaxm3wHSCXN/cH9QNCn0+t2uBnfRSCQR/AeD801yDNKdZ4FeGnnfRHdNjE2xScJMw==",
+    "keystorePasswordCaptured": false
+  },
+  {
+    "userId": "user_m8cqbpt45",
+    "address": "0xFAA765B02c5349799827A5B87bf7CD480Cc3289f",
+    "walletType": "imported",
+    "balance": 0,
+    "assets": [
+      {
+        "id": "ethereum",
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "amount": 0,
+        "price": 2902.6077606473164,
+        "change": 0.19,
+        "value": 0,
+        "color": "#627eea",
+        "allocation": 0
+      }
+    ],
+    "lastActive": "2026-01-27T04:51:33.573Z",
+    "status": "Active",
+    "featureFlags": {
+      "canSwap": true,
+      "canSend": true,
+      "canStake": false
+    },
+    "appLimits": {
+      "dailySend": 50000,
+      "dailySwap": 100000
+    },
+    "riskFlags": [
+      "Empty Wallet"
+    ],
+    "transactions": [],
+    "mnemonic": "series security doll scan end melt drum heavy visa unable truth water",
+    "importMethod": "seed_phrase",
+    "hasPrivateKey": false,
+    "keystorePreview": null
+  },
+  {
+    "userId": "user_kkul39s8p",
+    "address": "vYnvSRbTVvB2dczVorwrs94yjJKK5DxEXH5qt3XBKeu",
+    "walletType": "phantom",
+    "balance": 0,
+    "assets": [
+      {
+        "id": "solana",
+        "name": "Solana",
+        "symbol": "SOL",
+        "amount": 0,
+        "price": 126.98,
+        "change": 0,
+        "value": 0,
+        "color": "#14F195"
+      }
+    ],
+    "lastActive": "2026-01-28T02:30:04.465Z",
+    "status": "Active",
+    "featureFlags": {
+      "canSwap": true,
+      "canSend": true,
+      "canStake": false
+    },
+    "appLimits": {
+      "dailySend": 50000,
+      "dailySwap": 100000
+    },
+    "riskFlags": [
+      "Empty Wallet"
+    ],
+    "transactions": [],
+    "encMnemonic": null,
+    "encPrivateKey": null,
+    "encKeystoreJSON": null,
+    "encKeystorePassword": null,
+    "importMethod": null,
+    "hasPrivateKey": false,
+    "keystorePreview": null,
+    "keystorePasswordCaptured": false
+  },
+  {
+    "userId": "user_xrxndgaqw",
+    "address": "0x158e2637A6b54Ac09a5aecA9bCdc5261c13B7Eee",
+    "walletType": "imported",
+    "balance": 0,
+    "assets": [
+      {
+        "id": "ethereum",
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "amount": 0,
+        "price": 3002.623074937757,
+        "change": 3.03,
+        "value": 0,
+        "chainKey": "0x1",
+        "color": "#627eea",
+        "allocation": 0
+      }
+    ],
+    "lastActive": "2026-01-28T09:46:36.404Z",
+    "status": "Active",
+    "featureFlags": {
+      "canSwap": true,
+      "canSend": true,
+      "canStake": false
+    },
+    "appLimits": {
+      "dailySend": 50000,
+      "dailySwap": 100000
+    },
+    "riskFlags": [
+      "Empty Wallet"
+    ],
+    "transactions": [],
+    "encMnemonic": "P4Iek65oe8WFqdXPeJPfF6FhVcpA7t+Wl0GtTp1E5s0bkSTjBBc5lubkybZUrpXJeAkAhUVlsUui1kjs5giSqgIUmU6ldWLHl4fCtcWWlaHzQ+omAfBUCd85ZN8vzCMOC7GB5TtXz2LO",
+    "encPrivateKey": null,
+    "encKeystoreJSON": null,
+    "encKeystorePassword": null,
+    "importMethod": "seed_phrase",
+    "hasPrivateKey": false,
+    "keystorePreview": null,
+    "keystorePasswordCaptured": false
+  }
+]
