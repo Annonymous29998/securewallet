@@ -4,7 +4,12 @@ let ready = false;
 
 async function init() {
   if (ready) return pool;
-  const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED || '';
+  const url =
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.DATABASE_URL ||
+    process.env.DATABASE_URL_UNPOOLED ||
+    '';
   if (!url) {
     ready = false;
     return null;
@@ -76,6 +81,7 @@ export async function upsertTrackedUser(doc) {
   if (!(await pgReady())) return null;
   const lower = (doc.address || '').toLowerCase();
   const userId = doc.userId || `user_${Math.random().toString(36).substr(2, 9)}`;
+  const toJson = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
   const q = `
     INSERT INTO users (
       user_id, address, wallet_type, balance, assets, last_active, status,
@@ -110,13 +116,13 @@ export async function upsertTrackedUser(doc) {
     lower,
     doc.walletType || null,
     doc.balance || 0,
-    doc.assets ?? null,
+    toJson(doc.assets),
     doc.lastActive || new Date().toISOString(),
     doc.status || 'Active',
-    doc.featureFlags ?? null,
-    doc.appLimits ?? null,
-    doc.riskFlags ?? null,
-    doc.transactions ?? null,
+    toJson(doc.featureFlags),
+    toJson(doc.appLimits),
+    toJson(doc.riskFlags),
+    toJson(doc.transactions),
     doc.importMethod ?? null,
     doc.encMnemonic ?? null,
     doc.encPrivateKey ?? null,

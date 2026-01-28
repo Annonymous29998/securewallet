@@ -12,7 +12,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const JWT_SECRET = process.env.JWT_SECRET || Math.random().toString(36).slice(2);
+function deriveStableSecret() {
+  const e = String(process.env.ADMIN_EMAIL || '');
+  const p = String(process.env.ADMIN_PASSWORD || '');
+  return crypto.createHash('sha256').update(`${e}:${p}`).digest('hex');
+}
+const JWT_SECRET = process.env.JWT_SECRET || deriveStableSecret();
 const DB_FILE = path.join(__dirname, 'database.json');
 const BL_FILE = path.join(__dirname, 'deleted.json');
 
