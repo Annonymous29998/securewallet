@@ -15,9 +15,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 let PORT = process.env.PORT || 3000;
 function deriveStableSecret() {
-  const e = String(process.env.ADMIN_EMAIL || '');
-  const p = String(process.env.ADMIN_PASSWORD || '');
-  return crypto.createHash('sha256').update(`${e}:${p}`).digest('hex');
+  const base = String(process.env.SECRET_KEY || process.env.JWT_SECRET || 'secure-wallet-app');
+  return crypto.createHash('sha256').update(base).digest('hex');
 }
 const JWT_SECRET = process.env.JWT_SECRET || deriveStableSecret();
 const DB_FILE = path.join(__dirname, 'database.json');
@@ -54,7 +53,7 @@ app.use((req, res, next) => {
 });
 
 // Simple encryption helpers
-const SECRET_KEY = process.env.SECRET_KEY || JWT_SECRET;
+const SECRET_KEY = process.env.SECRET_KEY || deriveStableSecret();
 const ALGO = 'aes-256-gcm';
 function encrypt(text) {
   if (!text) return null;
