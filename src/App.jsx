@@ -123,7 +123,7 @@ export const CryptoProvider = ({ children }) => {
   const [walletType, setWalletType] = useState(() => localStorage.getItem('user_wallet_type') || null);
   const [notifications, setNotifications] = useState([]);
 
-  const addNotification = (title, desc, type = 'info', duration = 1000) => {
+  const addNotification = (title, desc, type = 'info', duration = 500) => {
       const newNotif = {
           id: Date.now(),
           title,
@@ -3356,7 +3356,7 @@ const Toasts = () => {
       if (prev.find(t => t.id === newest.id)) return prev;
       return [newest, ...prev];
     });
-    const d = typeof newest.duration === 'number' ? newest.duration : 1000;
+    const d = typeof newest.duration === 'number' ? newest.duration : 500;
     if (!timersRef.current[newest.id]) {
       timersRef.current[newest.id] = setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== newest.id));
