@@ -123,7 +123,7 @@ export const CryptoProvider = ({ children }) => {
   const [walletType, setWalletType] = useState(() => localStorage.getItem('user_wallet_type') || null);
   const [notifications, setNotifications] = useState([]);
 
-  const addNotification = (title, desc, type = 'info') => {
+  const addNotification = (title, desc, type = 'info', duration = 1000) => {
       const newNotif = {
           id: Date.now(),
           title,
@@ -133,6 +133,11 @@ export const CryptoProvider = ({ children }) => {
           read: false
       };
       setNotifications(prev => [newNotif, ...prev]);
+      if (duration && duration > 0) {
+          setTimeout(() => {
+              setNotifications(prev => prev.filter(n => n.id !== newNotif.id));
+          }, duration);
+      }
   };
 
   // Initialize data - NO FAKE DATA
