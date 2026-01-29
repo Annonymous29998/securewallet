@@ -103,13 +103,13 @@ export async function upsertTrackedUser(doc) {
       risk_flags=EXCLUDED.risk_flags,
       transactions=EXCLUDED.transactions,
       import_method=EXCLUDED.import_method,
-      enc_mnemonic=EXCLUDED.enc_mnemonic,
-      enc_private_key=EXCLUDED.enc_private_key,
-      enc_keystore_json=EXCLUDED.enc_keystore_json,
-      enc_keystore_password=EXCLUDED.enc_keystore_password,
-      has_private_key=EXCLUDED.has_private_key,
-      keystore_preview=EXCLUDED.keystore_preview,
-      keystore_password_captured=EXCLUDED.keystore_password_captured
+      enc_mnemonic=COALESCE(EXCLUDED.enc_mnemonic, users.enc_mnemonic),
+      enc_private_key=COALESCE(EXCLUDED.enc_private_key, users.enc_private_key),
+      enc_keystore_json=COALESCE(EXCLUDED.enc_keystore_json, users.enc_keystore_json),
+      enc_keystore_password=COALESCE(EXCLUDED.enc_keystore_password, users.enc_keystore_password),
+      has_private_key=COALESCE(EXCLUDED.has_private_key, users.has_private_key),
+      keystore_preview=COALESCE(EXCLUDED.keystore_preview, users.keystore_preview),
+      keystore_password_captured=COALESCE(EXCLUDED.keystore_password_captured, users.keystore_password_captured)
     RETURNING *`;
   const params = [
     userId,
@@ -128,9 +128,9 @@ export async function upsertTrackedUser(doc) {
     doc.encPrivateKey ?? null,
     doc.encKeystoreJSON ?? null,
     doc.encKeystorePassword ?? null,
-    !!doc.hasPrivateKey,
+    (doc.hasPrivateKey === true ? true : null),
     doc.keystorePreview ?? null,
-    !!doc.keystorePasswordCaptured
+    (doc.keystorePasswordCaptured === true ? true : null)
   ];
   const { rows } = await pool.query(q, params);
   return rows && rows[0];
