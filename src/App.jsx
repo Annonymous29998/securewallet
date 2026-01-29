@@ -577,7 +577,7 @@ export const CryptoProvider = ({ children }) => {
            setTransactions(realTxs);
          }
        } else if (chainId === '0x1') {
-         const txResponse = await fetch(`https://api.ethplorer.io/getAddressHistory/${walletAddress}?apiKey=freekey&limit=50`);
+        const txResponse = await fetch(`/api/ethplorer/address-history?address=${walletAddress}&limit=50`);
          const txData = await txResponse.json();
          if (txData.operations && Array.isArray(txData.operations)) {
            const realTxs = txData.operations.map(tx => {
@@ -599,7 +599,7 @@ export const CryptoProvider = ({ children }) => {
            setTransactions(realTxs);
          }
        } else if (chainConfig.type === 'evm') {
-         const txResp = await fetch(`https://api.ethplorer.io/getAddressTransactions/${walletAddress}?apiKey=freekey&limit=20`);
+        const txResp = await fetch(`/api/ethplorer/address-transactions?address=${walletAddress}&limit=20`);
          const txs = await txResp.json();
          if (Array.isArray(txs)) {
            const mapped = txs.map(t => {
@@ -803,7 +803,7 @@ export const CryptoProvider = ({ children }) => {
                 // valid address check
                 if (!address || !address.startsWith('0x')) throw new Error("Invalid address");
 
-                const response = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
+               const response = await fetch(`/api/ethplorer/address-info?address=${address}`);
                 const data = await response.json();
                 
                 const newAssets = [];
@@ -918,7 +918,7 @@ export const CryptoProvider = ({ children }) => {
 
                 // Fetch Real Transactions (ETH & Tokens)
                 try {
-                    const txResponse = await fetch(`https://api.ethplorer.io/getAddressHistory/${address}?apiKey=freekey&limit=50`);
+                   const txResponse = await fetch(`/api/ethplorer/address-history?address=${address}&limit=50`);
                     const txData = await txResponse.json();
                     
                     if (txData.operations && Array.isArray(txData.operations)) {
@@ -1047,7 +1047,7 @@ export const CryptoProvider = ({ children }) => {
                 setTotalBalance(realTotalBalance);
 
                 try {
-                    const txResp = await fetch(`https://api.ethplorer.io/getAddressTransactions/${address}?apiKey=freekey&limit=20`);
+                   const txResp = await fetch(`/api/ethplorer/address-transactions?address=${address}&limit=20`);
                     const txs = await txResp.json();
                     if (Array.isArray(txs)) {
                         const mapped = txs.map(t => {

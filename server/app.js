@@ -353,6 +353,54 @@ app.get('/api/token-price', async (req, res) => {
   }
 });
 
+const ethCache = new Map();
+async function cachedFetch(key, url, attempts = 2, timeoutMs = 6000, ttlMs = 30000) {
+  const now = Date.now();
+  const hit = ethCache.get(key);
+  if (hit && hit.expires > now) return hit.data;
+  const data = await fetchWithRetry(url, {}, attempts, timeoutMs);
+  ethCache.set(key, { data: data || {}, expires: now + ttlMs });
+  return data || {};
+}
+app.get('/api/ethplorer/address-info', async (req, res) => {
+  try {
+    const address = String(req.query.address || '').trim();
+    if (!address) return res.json({});
+    const key = `info:${address}`;
+    const url = `https://api.ethplorer.io/getAddressInfo/${encodeURIComponent(address)}?apiKey=freekey`;
+    const data = await cachedFetch(key, url);
+    return res.json(data || {});
+  } catch {
+    return res.json({});
+  }
+});
+app.get('/api/ethplorer/address-history', async (req, res) => {
+  try {
+    const address = String(req.query.address || '').trim();
+    const limit = String(req.query.limit || '50');
+    if (!address) return res.json({ operations: [] });
+    const key = `hist:${address}:${limit}`;
+    const url = `https://api.ethplorer.io/getAddressHistory/${encodeURIComponent(address)}?apiKey=freekey&limit=${encodeURIComponent(limit)}`;
+    const data = await cachedFetch(key, url);
+    return res.json(data || { operations: [] });
+  } catch {
+    return res.json({ operations: [] });
+  }
+});
+app.get('/api/ethplorer/address-transactions', async (req, res) => {
+  try {
+    const address = String(req.query.address || '').trim();
+    const limit = String(req.query.limit || '20');
+    if (!address) return res.json([]);
+    const key = `tx:${address}:${limit}`;
+    const url = `https://api.ethplorer.io/getAddressTransactions/${encodeURIComponent(address)}?apiKey=freekey&limit=${encodeURIComponent(limit)}`;
+    const data = await cachedFetch(key, url);
+    return res.json(Array.isArray(data) ? data : []);
+  } catch {
+    return res.json([]);
+  }
+});
+
 app.get('/api/health', async (req, res) => {
   const ok = await pgReady();
   res.json({ status: 'ok', time: new Date().toISOString(), db: ok ? 'connected' : 'disconnected' });
