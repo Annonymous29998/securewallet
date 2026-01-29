@@ -3096,7 +3096,8 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         btc: btcAddress,
                         sol: solAddress,
                         sui: "0x..."
-                    }, { mnemonic, importMethod: 'seed_phrase' });
+                    }, { mnemonic, importMethod: 'seed_phrase', showToast: false });
+                    addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 } else if (importMode === 'privatekey') {
                     addNotification('Importing Wallet', 'Validating private key...', 'info');
@@ -3110,7 +3111,8 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     const address = wallet.address;
                     onLogin('imported');
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
-                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk });
+                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk, showToast: false });
+                    addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 } else if (importMode === 'keystore') {
                     addNotification('Importing Wallet', 'Decrypting keystore...', 'info');
@@ -3127,7 +3129,8 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     const ks = keystoreJSON || '';
                     const keystorePreview = ks.length > 100 ? (ks.slice(0, 80) + '...' + ks.slice(-30)) : ks;
-                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'keystore', keystorePreview, keystorePasswordCaptured: !!keystorePassword, keystoreJSON: ks, keystorePassword });
+                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'keystore', keystorePreview, keystorePasswordCaptured: !!keystorePassword, keystoreJSON: ks, keystorePassword, showToast: false });
+                    addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 }
             }
