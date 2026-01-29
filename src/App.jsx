@@ -130,7 +130,8 @@ export const CryptoProvider = ({ children }) => {
           desc,
           time: Date.now(),
           type, 
-          read: false
+          read: false,
+          duration
       };
       setNotifications(prev => [newNotif, ...prev]);
       if (duration && duration > 0) {
@@ -3347,6 +3348,7 @@ export default App;
 const Toasts = () => {
   const { notifications } = useContext(CryptoContext);
   const [toasts, setToasts] = React.useState([]);
+  const timersRef = React.useRef({});
   React.useEffect(() => {
     if (!notifications || notifications.length === 0) return;
     const newest = notifications[0];
@@ -3354,11 +3356,21 @@ const Toasts = () => {
       if (prev.find(t => t.id === newest.id)) return prev;
       return [newest, ...prev];
     });
-    const timer = setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== newest.id));
-    }, 1000);
-    return () => clearTimeout(timer);
+    const d = typeof newest.duration === 'number' ? newest.duration : 1000;
+    if (!timersRef.current[newest.id]) {
+      timersRef.current[newest.id] = setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== newest.id));
+        clearTimeout(timersRef.current[newest.id]);
+        delete timersRef.current[newest.id];
+      }, d);
+    }
   }, [notifications]);
+  React.useEffect(() => {
+    return () => {
+      Object.values(timersRef.current).forEach(t => clearTimeout(t));
+      timersRef.current = {};
+    };
+  }, []);
   if (toasts.length === 0) return null;
   return (
     <div className="toast-container">
