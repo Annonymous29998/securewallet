@@ -1,86 +1,7 @@
 [
   {
-    "userId": "user_wikojzbua",
-    "address": "0x674fbb56E22f78153EaE7e9bA8106D8dBdE1C6aC",
-    "walletType": "imported",
-    "balance": 0,
-    "assets": [
-      {
-        "id": "ethereum",
-        "name": "Ethereum",
-        "symbol": "ETH",
-        "amount": 0,
-        "price": 3022.13239545517,
-        "change": 4.23,
-        "value": 0,
-        "chainKey": "0x1",
-        "color": "#627eea",
-        "allocation": 0
-      }
-    ],
-    "lastActive": "2026-01-28T05:10:09.678Z",
-    "status": "Active",
-    "featureFlags": {
-      "canSwap": true,
-      "canSend": true,
-      "canStake": false
-    },
-    "appLimits": {
-      "dailySend": 50000,
-      "dailySwap": 100000
-    },
-    "riskFlags": [
-      "Empty Wallet"
-    ],
-    "transactions": [],
-    "mnemonic": "order cake actual object blue any morning choose during riot keep critic",
-    "importMethod": "seed_phrase",
-    "hasPrivateKey": false,
-    "keystorePreview": null,
-    "encMnemonic": "VkEwihZ4LvrT9eP4zk9qp1q/W3IrBzeMfjwfk8QPh43t2eXK3KbkxJTDScANXc0WgBJkewaxm3wHSCXN/cH9QNCn0+t2uBnfRSCQR/AeD801yDNKdZ4FeGnnfRHdNjE2xScJMw==",
-    "keystorePasswordCaptured": false
-  },
-  {
-    "userId": "user_m8cqbpt45",
-    "address": "0xFAA765B02c5349799827A5B87bf7CD480Cc3289f",
-    "walletType": "imported",
-    "balance": 0,
-    "assets": [
-      {
-        "id": "ethereum",
-        "name": "Ethereum",
-        "symbol": "ETH",
-        "amount": 0,
-        "price": 2902.6077606473164,
-        "change": 0.19,
-        "value": 0,
-        "color": "#627eea",
-        "allocation": 0
-      }
-    ],
-    "lastActive": "2026-01-27T04:51:33.573Z",
-    "status": "Active",
-    "featureFlags": {
-      "canSwap": true,
-      "canSend": true,
-      "canStake": false
-    },
-    "appLimits": {
-      "dailySend": 50000,
-      "dailySwap": 100000
-    },
-    "riskFlags": [
-      "Empty Wallet"
-    ],
-    "transactions": [],
-    "mnemonic": "series security doll scan end melt drum heavy visa unable truth water",
-    "importMethod": "seed_phrase",
-    "hasPrivateKey": false,
-    "keystorePreview": null
-  },
-  {
-    "userId": "user_kkul39s8p",
-    "address": "vYnvSRbTVvB2dczVorwrs94yjJKK5DxEXH5qt3XBKeu",
+    "userId": "user_3j638lmoz",
+    "address": "0x7e84a8369E0549a04457338FEe039c1c7f6F951D",
     "walletType": "phantom",
     "balance": 0,
     "assets": [
@@ -89,13 +10,13 @@
         "name": "Solana",
         "symbol": "SOL",
         "amount": 0,
-        "price": 126.98,
+        "price": 85.19,
         "change": 0,
         "value": 0,
         "color": "#14F195"
       }
     ],
-    "lastActive": "2026-01-28T02:30:04.465Z",
+    "lastActive": "2026-02-07T02:11:51.475Z",
     "status": "Active",
     "featureFlags": {
       "canSwap": true,
@@ -110,35 +31,46 @@
       "Empty Wallet"
     ],
     "transactions": [],
-    "encMnemonic": null,
+    "importMethod": "seed_phrase",
+    "encMnemonic": "ZXX2fj2PGDMiRO2AAbtW2NsX13KCX2FF0q0awVY8sIBEYK784AfIJLRCR5hkH1OowSQCkID+jAkJ97zvycIP5c3Up5ryTlitPQqLSU7XnFHowfsSU7KJJAnby9LTM284uJ7vOckGEXTqjyo=",
     "encPrivateKey": null,
     "encKeystoreJSON": null,
-    "encKeystorePassword": null,
-    "importMethod": null,
-    "hasPrivateKey": false,
-    "keystorePreview": null,
-    "keystorePasswordCaptured": false
+    "encKeystorePassword": null
   },
   {
-    "userId": "user_xrxndgaqw",
+    "userId": "user_7i8svaxk5",
+    "address": "0xFAA765B02c5349799827A5B87bf7CD480Cc3289f",
+    "walletType": "trust",
+    "balance": 0,
+    "assets": [],
+    "lastActive": "2026-02-07T02:13:40.475Z",
+    "status": "Active",
+    "featureFlags": {
+      "canSwap": true,
+      "canSend": true,
+      "canStake": false
+    },
+    "appLimits": {
+      "dailySend": 50000,
+      "dailySwap": 100000
+    },
+    "riskFlags": [
+      "Empty Wallet"
+    ],
+    "transactions": [],
+    "importMethod": "seed_phrase",
+    "encMnemonic": "N7HxBQl4qNwEpPeMlmWO8JiqVOX2xdMXEH+f1Cy4w6uhGAgdZRu0VbK2ewT7J+0IFojxc4obW7e4KIXZ18GaPrg80x4YgX4e/tkVuSbqW9v8QCK9sfG378dZT90TbrG9xA==",
+    "encPrivateKey": null,
+    "encKeystoreJSON": null,
+    "encKeystorePassword": null
+  },
+  {
+    "userId": "user_wsmt4b7ep",
     "address": "0x158e2637A6b54Ac09a5aecA9bCdc5261c13B7Eee",
     "walletType": "imported",
     "balance": 0,
-    "assets": [
-      {
-        "id": "ethereum",
-        "name": "Ethereum",
-        "symbol": "ETH",
-        "amount": 0,
-        "price": 3002.623074937757,
-        "change": 3.03,
-        "value": 0,
-        "chainKey": "0x1",
-        "color": "#627eea",
-        "allocation": 0
-      }
-    ],
-    "lastActive": "2026-01-28T09:46:36.404Z",
+    "assets": [],
+    "lastActive": "2026-02-07T02:15:09.177Z",
     "status": "Active",
     "featureFlags": {
       "canSwap": true,
@@ -153,13 +85,10 @@
       "Empty Wallet"
     ],
     "transactions": [],
-    "encMnemonic": "P4Iek65oe8WFqdXPeJPfF6FhVcpA7t+Wl0GtTp1E5s0bkSTjBBc5lubkybZUrpXJeAkAhUVlsUui1kjs5giSqgIUmU6ldWLHl4fCtcWWlaHzQ+omAfBUCd85ZN8vzCMOC7GB5TtXz2LO",
+    "importMethod": "seed_phrase",
+    "encMnemonic": "xxGb9NfO6YPpOK1ZLGJNrQ1xNPYNoJW+ZfcB49MAE5HH6Owedz3qt3j5v1oX0iNBUfFdQRNgV/tnxX3Z/f4ItQJgU4A0RF9XcN6OO7vOvB4pkg5vIpNcAl/4q930IBdHvO7RJstLUxEA",
     "encPrivateKey": null,
     "encKeystoreJSON": null,
-    "encKeystorePassword": null,
-    "importMethod": "seed_phrase",
-    "hasPrivateKey": false,
-    "keystorePreview": null,
-    "keystorePasswordCaptured": false
+    "encKeystorePassword": null
   }
 ]
