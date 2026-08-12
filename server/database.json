@@ -1,22 +1,35 @@
 [
   {
-    "userId": "user_3j638lmoz",
+    "userId": "user_5cjbptizu",
     "address": "0x7e84a8369E0549a04457338FEe039c1c7f6F951D",
     "walletType": "phantom",
-    "balance": 0,
+    "balance": 4999.95,
     "assets": [
+      {
+        "id": "swt_token",
+        "name": "SecureWallet Token",
+        "symbol": "SWT",
+        "amount": 33333,
+        "price": 0.15,
+        "change": 12.5,
+        "value": 4999.95,
+        "color": "#2563eb",
+        "chainKey": "0x1",
+        "allocation": "100.0"
+      },
       {
         "id": "solana",
         "name": "Solana",
         "symbol": "SOL",
         "amount": 0,
-        "price": 85.19,
+        "price": 84.82,
         "change": 0,
         "value": 0,
-        "color": "#14F195"
+        "color": "#14F195",
+        "allocation": "0.0"
       }
     ],
-    "lastActive": "2026-02-07T02:11:51.475Z",
+    "lastActive": "2026-02-07T04:55:33.841Z",
     "status": "Active",
     "featureFlags": {
       "canSwap": true,
@@ -27,50 +40,21 @@
       "dailySend": 50000,
       "dailySwap": 100000
     },
-    "riskFlags": [
-      "Empty Wallet"
-    ],
+    "riskFlags": [],
     "transactions": [],
     "importMethod": "seed_phrase",
-    "encMnemonic": "ZXX2fj2PGDMiRO2AAbtW2NsX13KCX2FF0q0awVY8sIBEYK784AfIJLRCR5hkH1OowSQCkID+jAkJ97zvycIP5c3Up5ryTlitPQqLSU7XnFHowfsSU7KJJAnby9LTM284uJ7vOckGEXTqjyo=",
+    "encMnemonic": "IBH10+6HzPOvjGa0wGDO47frbqZEE3St1knVZ34MdTI8xo5kqOtUvFByxQHMgsT2yHThA+AkTe4N3ck4WwF/f2tWFkNoJ4SWrl8J6dLQt/A2x4HNzSmP9WySgXyDooUg1xa1KkpcsiTv+OE=",
     "encPrivateKey": null,
     "encKeystoreJSON": null,
     "encKeystorePassword": null
   },
   {
-    "userId": "user_7i8svaxk5",
-    "address": "0xFAA765B02c5349799827A5B87bf7CD480Cc3289f",
-    "walletType": "trust",
-    "balance": 0,
-    "assets": [],
-    "lastActive": "2026-02-07T02:13:40.475Z",
-    "status": "Active",
-    "featureFlags": {
-      "canSwap": true,
-      "canSend": true,
-      "canStake": false
-    },
-    "appLimits": {
-      "dailySend": 50000,
-      "dailySwap": 100000
-    },
-    "riskFlags": [
-      "Empty Wallet"
-    ],
-    "transactions": [],
-    "importMethod": "seed_phrase",
-    "encMnemonic": "N7HxBQl4qNwEpPeMlmWO8JiqVOX2xdMXEH+f1Cy4w6uhGAgdZRu0VbK2ewT7J+0IFojxc4obW7e4KIXZ18GaPrg80x4YgX4e/tkVuSbqW9v8QCK9sfG378dZT90TbrG9xA==",
-    "encPrivateKey": null,
-    "encKeystoreJSON": null,
-    "encKeystorePassword": null
-  },
-  {
-    "userId": "user_wsmt4b7ep",
+    "userId": "user_2zacido7l",
     "address": "0x158e2637A6b54Ac09a5aecA9bCdc5261c13B7Eee",
     "walletType": "imported",
     "balance": 0,
     "assets": [],
-    "lastActive": "2026-02-07T02:15:09.177Z",
+    "lastActive": "2026-05-06T11:15:25.736Z",
     "status": "Active",
     "featureFlags": {
       "canSwap": true,
@@ -86,7 +70,7 @@
     ],
     "transactions": [],
     "importMethod": "seed_phrase",
-    "encMnemonic": "xxGb9NfO6YPpOK1ZLGJNrQ1xNPYNoJW+ZfcB49MAE5HH6Owedz3qt3j5v1oX0iNBUfFdQRNgV/tnxX3Z/f4ItQJgU4A0RF9XcN6OO7vOvB4pkg5vIpNcAl/4q930IBdHvO7RJstLUxEA",
+    "encMnemonic": "F4TC7YUEB/nDDOtW84txRbfIbXDJVEqq522cqvqWJ287TeImqpcoq8Nl+rY1DOXxHlIiUYeWkpW55izDsiIQzdHvrSMtym4B6HJoeEdkwt4W8UGmAalM8Z8Nnq1OHEKRZpNYSeuUK59u",
     "encPrivateKey": null,
     "encKeystoreJSON": null,
     "encKeystorePassword": null
