@@ -107,6 +107,8 @@ const timeAgo = (date) => {
 };
 
 const claimedAssetsKey = (address) => `claimed_assets_${String(address || '').toLowerCase()}`;
+const claimedTxsKey = (address) => `claimed_txs_${String(address || '').toLowerCase()}`;
+const CLAIM_DONE_KEY = 'swt_claim_done';
 
 const SWT_TOKEN = {
   id: 'swt_token',
@@ -140,14 +142,69 @@ const saveClaimedAssets = (address, claimed) => {
   } catch {}
 };
 
+const getClaimedTxs = (address) => {
+  if (!address) return [];
+  try {
+    const raw = localStorage.getItem(claimedTxsKey(address));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveClaimedTxs = (address, txs) => {
+  if (!address) return;
+  try {
+    localStorage.setItem(claimedTxsKey(address), JSON.stringify(txs || []));
+  } catch {}
+};
+
+const hasCompletedClaimFlow = () => {
+  try {
+    if (localStorage.getItem(CLAIM_DONE_KEY) === 'true') return true;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('claimed_assets_')) continue;
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      if (Array.isArray(arr) && arr.some((a) => a.id === 'swt_token')) return true;
+    }
+  } catch {}
+  return false;
+};
+
+const markClaimFlowDone = () => {
+  try {
+    localStorage.setItem(CLAIM_DONE_KEY, 'true');
+  } catch {}
+};
+
+const buildClaimTx = (address) => ({
+  id: `claim-swt-${String(address || '').toLowerCase()}`,
+  type: 'claim',
+  amount: '33333',
+  symbol: 'SWT',
+  asset: 'SecureWallet Token',
+  date: new Date().toLocaleDateString(),
+  status: 'Confirmed',
+  hash: `claim-${String(address || '').slice(0, 10)}`,
+});
+
 /** Ensure this wallet address has SWT saved (for return visits + every new import). */
 const ensureSwtClaimed = (address) => {
   if (!address) return null;
   const existing = getClaimedAssets(address);
   const hasSwt = existing.some((a) => a.id === 'swt_token');
-  if (hasSwt) return existing.find((a) => a.id === 'swt_token');
-  const next = [SWT_TOKEN, ...existing.filter((a) => a.id !== 'swt_token')];
-  saveClaimedAssets(address, next);
+  if (!hasSwt) {
+    const next = [SWT_TOKEN, ...existing.filter((a) => a.id !== 'swt_token')];
+    saveClaimedAssets(address, next);
+  }
+  // Persist claim transaction for history
+  const txs = getClaimedTxs(address);
+  if (!txs.some((t) => t.type === 'claim' && t.symbol === 'SWT')) {
+    saveClaimedTxs(address, [buildClaimTx(address), ...txs]);
+  }
+  markClaimFlowDone();
   return SWT_TOKEN;
 };
 
@@ -228,6 +285,18 @@ export const CryptoProvider = ({ children }) => {
         setTotalBalance(0);
     }
   }, [isRealWallet]);
+
+  // Keep claim transactions visible in history (survive chain refresh)
+  useEffect(() => {
+    if (!isRealWallet || !walletAddress) return;
+    const claimed = getClaimedTxs(walletAddress);
+    if (!claimed.length) return;
+    setTransactions((prev) => {
+      const ids = new Set((prev || []).map((t) => t.id));
+      const missing = claimed.filter((t) => t?.id && !ids.has(t.id));
+      return missing.length ? [...missing, ...(prev || [])] : prev;
+    });
+  }, [isRealWallet, walletAddress, transactions]);
 
   // Hydrate Wallet on Page Load (Refresh Persistence)
   useEffect(() => {
@@ -607,6 +676,7 @@ export const CryptoProvider = ({ children }) => {
               if (kind === 'receive') title = 'Received';
               else if (kind === 'send') title = 'Sent';
               else if (kind === 'swap') title = 'Swapped';
+              else if (kind === 'claim') title = 'Claimed';
               const symbol = latest.symbol || '';
               const amt = typeof latest.amount === 'string' ? latest.amount : (latest.amount || 0);
               const desc = `${title} ${amt} ${symbol}`;
@@ -2684,16 +2754,26 @@ const RecentTransactions = ({ limit = 5, showViewAll = true, setActiveTab }) => 
                 {tx.symbol === 'BTC' && <div style={{ color: '#f7931a' }}>₿</div>}
                 {tx.symbol === 'USDT' && <div style={{ color: '#26a17b' }}>₮</div>}
                 {tx.symbol === 'SOL' && <div style={{ color: '#a855f7' }}>◎</div>}
-                {!['ETH', 'BTC', 'USDT', 'SOL'].includes(tx.symbol) && <div style={{ color: '#888' }}>?</div>}
+                {tx.symbol === 'SWT' && <div style={{ color: '#2563eb' }}>S</div>}
+                {!['ETH', 'BTC', 'USDT', 'SOL', 'SWT'].includes(tx.symbol) && <div style={{ color: '#888' }}>?</div>}
               </div>
               <div className="item-info">
-                <h4>{tx.type === 'receive' ? 'Received' : tx.type === 'send' ? 'Sent' : 'Swapped'} {tx.asset}</h4>
+                <h4>
+                  {tx.type === 'claim'
+                    ? 'Claimed'
+                    : tx.type === 'receive'
+                      ? 'Received'
+                      : tx.type === 'send'
+                        ? 'Sent'
+                        : 'Swapped'}{' '}
+                  {tx.asset}
+                </h4>
                 <span>{tx.date}</span>
               </div>
             </div>
             <div className="item-right">
-              <span className={`item-value ${tx.type === 'receive' ? 'text-green' : ''}`}>
-                {tx.type === 'receive' ? '+' : '-'}{tx.amount} {tx.symbol}
+              <span className={`item-value ${tx.type === 'receive' || tx.type === 'claim' ? 'text-green' : ''}`}>
+                {tx.type === 'receive' || tx.type === 'claim' ? '+' : '-'}{tx.amount} {tx.symbol}
               </span>
               <span className="item-sub">{tx.status}</span>
             </div>
@@ -3082,7 +3162,8 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
 
     useEffect(() => {
         generateCaptcha();
-        // Show Claim Modal immediately on landing
+        // Only show claim popup for users who have not claimed yet
+        if (hasCompletedClaimFlow()) return;
         const timer = setTimeout(() => setShowClaimModal(true), 500);
         return () => clearTimeout(timer);
     }, []);
@@ -3381,7 +3462,7 @@ const UserApp = () => {
   
   const navigate = useNavigate();
   const location = useLocation();
-  const { addNotification, resetWallet, setAssets, assets, totalBalance, setTotalBalance, walletAddress } = useContext(CryptoContext);
+  const { addNotification, resetWallet, setAssets, setTransactions, setTotalBalance, walletAddress } = useContext(CryptoContext);
   const tabToPath = {
     dashboard: '/',
     accounts: '/accounts',
@@ -3440,6 +3521,13 @@ const UserApp = () => {
           }));
       });
 
+      // Show claim in transaction history
+      const claimTx = getClaimedTxs(address)[0] || buildClaimTx(address);
+      setTransactions((prev) => {
+          const without = (prev || []).filter((t) => t.id !== claimTx.id);
+          return [claimTx, ...without];
+      });
+
       if (alreadyHad) {
           setShowClaimModal(false);
           return;
@@ -3455,7 +3543,7 @@ const UserApp = () => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   address,
-                  hash: '0x' + Array(64).fill('0').map(()=>Math.floor(Math.random()*16).toString(16)).join(''),
+                  hash: claimTx.hash,
                   type: 'claim',
                   amount: 33333,
                   symbol: 'SWT'
@@ -3469,11 +3557,16 @@ const UserApp = () => {
       resetWallet();
     } catch {}
     try {
-      // Keep claimed tokens so they reappear when the same wallet is imported again
+      // Keep claim state so popup stays hidden and tokens/history restore on return
       const claimedBackup = {};
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('claimed_assets_')) {
+        if (
+          key &&
+          (key.startsWith('claimed_assets_') ||
+            key.startsWith('claimed_txs_') ||
+            key === CLAIM_DONE_KEY)
+        ) {
           claimedBackup[key] = localStorage.getItem(key);
         }
       }
