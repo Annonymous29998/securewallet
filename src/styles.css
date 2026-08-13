@@ -28,6 +28,18 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* Stop iOS Safari auto-zoom / bounce zoom on focus */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iOS zooms inputs under 16px — keep form fields at least 16px */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+  touch-action: manipulation;
 }
 
 button {
@@ -1172,7 +1184,7 @@ input:checked + .slider:before {
   border: 1px solid var(--border);
   border-radius: 6px;
   color: white;
-  font-size: 0.9rem;
+  font-size: 16px;
 }
 
 .captcha-input:focus {
