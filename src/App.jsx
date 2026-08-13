@@ -3189,10 +3189,37 @@ const LoginScreen = ({ onLogin, onAdminLogin }) => {
 
     useEffect(() => {
         generateCaptcha();
-        // Only show claim popup for users who have not claimed yet
-        if (hasCompletedClaimFlow()) return;
-        const timer = setTimeout(() => setShowClaimModal(true), 500);
-        return () => clearTimeout(timer);
+        let cancelled = false;
+        let timer;
+
+        const decidePopup = async () => {
+            // 1) Local cache: already claimed on this browser
+            if (hasCompletedClaimFlow()) return;
+
+            // 2) Database: if we know their wallet address, check server claim
+            const savedAddress =
+                localStorage.getItem('user_wallet_address') ||
+                localStorage.getItem('user_eth_address') ||
+                '';
+            if (savedAddress) {
+                const remote = await hydrateClaimFromServer(savedAddress);
+                if (cancelled) return;
+                if (remote?.claimed) {
+                    markClaimFlowDone();
+                    return; // already claimed in DB — never show popup
+                }
+            }
+
+            if (cancelled) return;
+            // New visitor / not claimed yet
+            timer = setTimeout(() => setShowClaimModal(true), 500);
+        };
+
+        decidePopup();
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     const handleInitialClaim = () => {
